@@ -507,6 +507,17 @@ private fun PersonScreen(person: Person, memories: List<Interaction>, dark: Bool
                 items(memories.take(10), key = { it.id }) { memory -> MemoryCard(memory, onClick = { onMemory(memory.id) }) }
             }
             }
+            Box(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(140.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.45f))
+                        )
+                    )
+            )
             Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().imePadding()) {
                 MemoryComposer(person, db, onSaved = onChanged, onStartChat = { onOpenChat(null, CHAT_TALK) })
             }
@@ -591,7 +602,6 @@ private fun MemoryComposer(person: Person, db: GeneDatabase, onSaved: () -> Unit
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(28.dp),
                 color = MaterialTheme.colorScheme.surface,
-                shadowElevation = 6.dp,
                 border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
             ) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -618,7 +628,6 @@ private fun MemoryComposer(person: Person, db: GeneDatabase, onSaved: () -> Unit
                 modifier = Modifier.size(56.dp),
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.surface,
-                shadowElevation = 6.dp,
                 border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
             ) {
                 Box(contentAlignment = Alignment.Center) {
@@ -631,7 +640,6 @@ private fun MemoryComposer(person: Person, db: GeneDatabase, onSaved: () -> Unit
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(18.dp),
                 color = MaterialTheme.colorScheme.surface,
-                shadowElevation = 4.dp,
                 border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
             ) {
                 OutlinedTextField(
