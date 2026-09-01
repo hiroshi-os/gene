@@ -4,6 +4,8 @@ import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
+import org.json.JSONArray
+import org.json.JSONObject
 
 const val TYPE_TEXT = "text"
 const val TYPE_AUDIO = "audio"
@@ -21,6 +23,7 @@ data class Person(val id: Long, val name: String, val note: String, val createdA
 data class Interaction(val id: Long, val personId: Long, val type: String, val body: String, val createdAt: Long, val audioUri: String? = null, val transcript: String? = null, val transcriptionStatus: String = TRANSCRIPTION_NONE)
 data class ChatSession(val id: Long, val personId: Long, val title: String, val createdAt: Long, val updatedAt: Long, val messageCount: Int, val favorite: Boolean, val mode: String = "talk")
 data class ChatMessage(val id: Long, val sessionId: Long, val role: String, val body: String, val createdAt: Long, val confidence: Int?, val referenceIds: List<Long>)
+data class ImportSummary(val peopleCount: Int, val memoryCount: Int, val sessionCount: Int, val messageCount: Int)
 
 class GeneDatabase(context: Context) : SQLiteOpenHelper(context, "gene.db", null, 8) {
     override fun onConfigure(db: SQLiteDatabase) { db.setForeignKeyConstraintsEnabled(true) }
@@ -140,4 +143,221 @@ class GeneDatabase(context: Context) : SQLiteOpenHelper(context, "gene.db", null
     fun messages(sessionId: Long): List<ChatMessage> = readableDatabase.rawQuery("SELECT id, session_id, role, body, created_at, confidence, reference_ids FROM messages WHERE session_id = ? ORDER BY created_at ASC", arrayOf(sessionId.toString())).use { c -> buildList { while (c.moveToNext()) add(readMessage(c)) } }
     fun recentMessagesFromOtherSessions(personId: Long, excludedSessionId: Long, limit: Int = 8): List<ChatMessage> = readableDatabase.rawQuery("SELECT m.id, m.session_id, m.role, m.body, m.created_at, m.confidence, m.reference_ids FROM messages m JOIN sessions s ON s.id = m.session_id WHERE s.person_id = ? AND s.id != ? ORDER BY m.created_at DESC LIMIT ?", arrayOf(personId.toString(), excludedSessionId.toString(), limit.toString())).use { c -> buildList { while (c.moveToNext()) add(readMessage(c)) }.asReversed() }
     private fun readMessage(c: android.database.Cursor): ChatMessage = ChatMessage(c.getLong(0), c.getLong(1), c.getString(2), c.getString(3), c.getLong(4), if (c.isNull(5)) null else c.getInt(5), c.getString(6).split(",").mapNotNull { it.trim().toLongOrNull() })
+
+    fun exportToJson(): String {
+        val root = JSONObject()
+        root.put("version", 1)
+        root.put("app", "Gene")
+        root.put("exported_at", System.currentTimeMillis())
+
+        val peopleArray = JSONArray()
+        val allPeople = people()
+        for (person in allPeople) {
+            val pObj = JSONObject()
+            pObj.put("id", person.id)
+            pObj.put("name", person.name)
+            pObj.put("note", person.note)
+            pObj.put("created_at", person.createdAt)
+            pObj.put("last_seen", person.lastSeen)
+            if (person.summary != null) pObj.put("summary", person.summary) else pObj.put("summary", JSONObject.NULL)
+            pObj.put("summary_memory_count", person.summaryMemoryCount)
+            pObj.put("favorite", person.favorite)
+
+            val interactionsList = interactions(person.id)
+            val iArray = JSONArray()
+            for (i in interactionsList) {
+                val iObj = JSONObject()
+                iObj.put("id", i.id)
+                iObj.put("type", i.type)
+                iObj.put("body", i.body)
+                iObj.put("created_at", i.createdAt)
+                if (i.audioUri != null) iObj.put("audio_uri", i.audioUri) else iObj.put("audio_uri", JSONObject.NULL)
+                if (i.transcript != null) iObj.put("transcript", i.transcript) else iObj.put("transcript", JSONObject.NULL)
+                iObj.put("transcription_status", i.transcriptionStatus)
+                iArray.put(iObj)
+            }
+            pObj.put("interactions", iArray)
+
+            val sessionsList = sessions(person.id)
+            val sArray = JSONArray()
+            for (s in sessionsList) {
+                val sObj = JSONObject()
+                sObj.put("id", s.id)
+                sObj.put("title", s.title)
+                sObj.put("created_at", s.createdAt)
+                sObj.put("updated_at", s.updatedAt)
+                sObj.put("favorite", s.favorite)
+                sObj.put("mode", s.mode)
+
+                val messagesList = messages(s.id)
+                val mArray = JSONArray()
+                for (m in messagesList) {
+                    val mObj = JSONObject()
+                    mObj.put("id", m.id)
+                    mObj.put("role", m.role)
+                    mObj.put("body", m.body)
+                    mObj.put("created_at", m.createdAt)
+                    if (m.confidence != null) mObj.put("confidence", m.confidence) else mObj.put("confidence", JSONObject.NULL)
+                    val refArray = JSONArray()
+                    m.referenceIds.forEach { refId -> refArray.put(refId) }
+                    mObj.put("reference_ids", refArray)
+                    mArray.put(mObj)
+                }
+                sObj.put("messages", mArray)
+                sArray.put(sObj)
+            }
+            pObj.put("sessions", sArray)
+
+            peopleArray.put(pObj)
+        }
+        root.put("people", peopleArray)
+        return root.toString(2)
+    }
+
+    fun parseBackupSummary(jsonStr: String): ImportSummary? {
+        return try {
+            val root = JSONObject(jsonStr)
+            val peopleArr = root.optJSONArray("people") ?: return null
+            var memoriesCount = 0
+            var sessionsCount = 0
+            var messagesCount = 0
+            for (i in 0 until peopleArr.length()) {
+                val p = peopleArr.optJSONObject(i) ?: continue
+                val iArr = p.optJSONArray("interactions")
+                if (iArr != null) memoriesCount += iArr.length()
+                val sArr = p.optJSONArray("sessions")
+                if (sArr != null) {
+                    sessionsCount += sArr.length()
+                    for (j in 0 until sArr.length()) {
+                        val s = sArr.optJSONObject(j) ?: continue
+                        val mArr = s.optJSONArray("messages")
+                        if (mArr != null) messagesCount += mArr.length()
+                    }
+                }
+            }
+            ImportSummary(peopleArr.length(), memoriesCount, sessionsCount, messagesCount)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun importFromJson(jsonStr: String, replaceExisting: Boolean = false): ImportSummary {
+        val root = JSONObject(jsonStr)
+        val peopleArr = root.optJSONArray("people") ?: throw IllegalArgumentException("Missing people data in backup")
+
+        var totalMemories = 0
+        var totalSessions = 0
+        var totalMessages = 0
+
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            if (replaceExisting) {
+                db.delete("messages", null, null)
+                db.delete("sessions", null, null)
+                db.delete("interactions", null, null)
+                db.delete("people", null, null)
+            }
+
+            for (i in 0 until peopleArr.length()) {
+                val p = peopleArr.optJSONObject(i) ?: continue
+                val pCv = ContentValues().apply {
+                    put("name", p.optString("name", "Unknown"))
+                    put("note", p.optString("note", ""))
+                    put("created_at", p.optLong("created_at", System.currentTimeMillis()))
+                    put("last_seen", p.optLong("last_seen", System.currentTimeMillis()))
+                    if (p.has("summary") && !p.isNull("summary")) put("summary", p.optString("summary"))
+                    put("summary_memory_count", p.optInt("summary_memory_count", 0))
+                    put("favorite", if (p.optBoolean("favorite", false)) 1 else 0)
+                }
+                val newPersonId = db.insert("people", null, pCv)
+                if (newPersonId <= 0) continue
+
+                val memoryIdMap = mutableMapOf<Long, Long>()
+                val iArr = p.optJSONArray("interactions")
+                if (iArr != null) {
+                    for (j in 0 until iArr.length()) {
+                        val item = iArr.optJSONObject(j) ?: continue
+                        val oldId = item.optLong("id", -1L)
+                        val iCv = ContentValues().apply {
+                            put("person_id", newPersonId)
+                            put("type", item.optString("type", TYPE_TEXT))
+                            put("body", item.optString("body", ""))
+                            put("created_at", item.optLong("created_at", System.currentTimeMillis()))
+                            if (item.has("audio_uri") && !item.isNull("audio_uri")) put("audio_uri", item.optString("audio_uri"))
+                            if (item.has("transcript") && !item.isNull("transcript")) put("transcript", item.optString("transcript"))
+                            put("transcription_status", item.optString("transcription_status", TRANSCRIPTION_NONE))
+                        }
+                        val newMemoryId = db.insert("interactions", null, iCv)
+                        if (newMemoryId > 0) {
+                            if (oldId > 0) memoryIdMap[oldId] = newMemoryId
+                            totalMemories++
+                        }
+                    }
+                }
+
+                val sArr = p.optJSONArray("sessions")
+                if (sArr != null) {
+                    for (j in 0 until sArr.length()) {
+                        val s = sArr.optJSONObject(j) ?: continue
+                        val sCv = ContentValues().apply {
+                            put("person_id", newPersonId)
+                            put("title", s.optString("title", "New conversation"))
+                            put("created_at", s.optLong("created_at", System.currentTimeMillis()))
+                            put("updated_at", s.optLong("updated_at", System.currentTimeMillis()))
+                            put("favorite", if (s.optBoolean("favorite", false)) 1 else 0)
+                            put("mode", s.optString("mode", "talk"))
+                        }
+                        val newSessionId = db.insert("sessions", null, sCv)
+                        if (newSessionId <= 0) continue
+                        totalSessions++
+
+                        val mArr = s.optJSONArray("messages")
+                        if (mArr != null) {
+                            for (k in 0 until mArr.length()) {
+                                val m = mArr.optJSONObject(k) ?: continue
+                                val refList = mutableListOf<Long>()
+                                val refArr = m.optJSONArray("reference_ids")
+                                if (refArr != null) {
+                                    for (r in 0 until refArr.length()) {
+                                        val oldRef = refArr.optLong(r)
+                                        val mapped = memoryIdMap[oldRef] ?: oldRef
+                                        refList.add(mapped)
+                                    }
+                                } else {
+                                    val refStr = m.optString("reference_ids", "")
+                                    if (refStr.isNotBlank()) {
+                                        refStr.split(",").forEach { token ->
+                                            token.trim().toLongOrNull()?.let { oldRef ->
+                                                refList.add(memoryIdMap[oldRef] ?: oldRef)
+                                            }
+                                        }
+                                    }
+                                }
+                                val mCv = ContentValues().apply {
+                                    put("session_id", newSessionId)
+                                    put("role", m.optString("role", ROLE_USER))
+                                    put("body", m.optString("body", ""))
+                                    put("created_at", m.optLong("created_at", System.currentTimeMillis()))
+                                    if (m.has("confidence") && !m.isNull("confidence")) {
+                                        put("confidence", m.optInt("confidence"))
+                                    } else {
+                                        putNull("confidence")
+                                    }
+                                    put("reference_ids", refList.joinToString(","))
+                                }
+                                if (db.insert("messages", null, mCv) > 0) {
+                                    totalMessages++
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+        return ImportSummary(peopleArr.length(), totalMemories, totalSessions, totalMessages)
+    }
 }

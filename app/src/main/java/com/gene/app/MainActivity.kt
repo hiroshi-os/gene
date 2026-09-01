@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -59,6 +60,8 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ChevronLeft
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.KeyboardVoice
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Refresh
@@ -75,6 +78,7 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.material.icons.outlined.TextSnippet
 import androidx.compose.material.icons.outlined.WbSunny
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -133,6 +137,7 @@ import com.gene.app.data.InsightEngine
 import com.gene.app.data.ChatMessage
 import com.gene.app.data.ChatSession
 import com.gene.app.data.Interaction
+import com.gene.app.data.ImportSummary
 import com.gene.app.data.LocalRelevanceSearch
 import com.gene.app.data.Person
 import com.gene.app.data.ROLE_ASSISTANT
@@ -147,6 +152,7 @@ import com.gene.app.data.TRANSCRIPTION_COMPLETE
 import com.gene.app.data.TRANSCRIPTION_PENDING
 import com.gene.app.data.TRANSCRIPTION_UNAVAILABLE
 import com.gene.app.service.FloatingCaptureService
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -230,8 +236,6 @@ private fun GeneApp(initialPersonId: Long = -1L) {
         when (val current = screen) {
             AppScreen.Home -> HomeScreen(
                 people = people,
-                dark = dark,
-                onToggleTheme = toggleDark,
                 onPerson = { screen = AppScreen.PersonDetail(it) },
                 onSettings = { screen = AppScreen.Settings },
                 onPersonCreated = { name, note -> val id = db.addPerson(name, note); refresh++; screen = AppScreen.PersonDetail(id) },
@@ -293,7 +297,9 @@ private fun GeneApp(initialPersonId: Long = -1L) {
                 dark = dark,
                 onToggleTheme = toggleDark,
                 onBack = { screen = AppScreen.Home },
-                context = context
+                context = context,
+                db = db,
+                onDataChanged = { refresh++ }
             )
         }
     }
@@ -303,8 +309,6 @@ private fun GeneApp(initialPersonId: Long = -1L) {
 @Composable
 private fun HomeScreen(
     people: List<Person>,
-    dark: Boolean,
-    onToggleTheme: () -> Unit,
     onPerson: (Long) -> Unit,
     onSettings: () -> Unit,
     onPersonCreated: (String, String) -> Unit,
@@ -316,7 +320,6 @@ private fun HomeScreen(
             TopAppBar(
                 title = { Text("gene", style = MaterialTheme.typography.titleLarge) },
                 actions = {
-                    IconButton(onClick = onToggleTheme) { Icon(if (dark) Icons.Outlined.LightMode else Icons.Outlined.WbSunny, "Toggle theme") }
                     IconButton(onClick = onSettings) { Icon(Icons.Outlined.Settings, "Settings") }
                 }
             )
@@ -1070,13 +1073,84 @@ private fun DeletePersonSheet(person: Person, db: GeneDatabase, onDismiss: () ->
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SettingsScreen(dark: Boolean, onToggleTheme: () -> Unit, onBack: () -> Unit, context: android.content.Context) {
+private fun SettingsScreen(
+    dark: Boolean,
+    onToggleTheme: () -> Unit,
+    onBack: () -> Unit,
+    context: android.content.Context,
+    db: GeneDatabase,
+    onDataChanged: () -> Unit
+) {
     val prefs = remember { context.getSharedPreferences("gene_settings", android.content.Context.MODE_PRIVATE) }
     var bubble by remember { mutableStateOf(prefs.getBoolean("bubble_enabled", false)) }
     var endpoint by remember { mutableStateOf(prefs.getString("llm_endpoint", "").orEmpty()) }
     var apiKey by remember { mutableStateOf(prefs.getString("llm_api_key", "").orEmpty()) }
     var model by remember { mutableStateOf(prefs.getString("llm_model", "gpt-5-mini").orEmpty()) }
     var saved by remember { mutableStateOf(false) }
+
+    val scope = rememberCoroutineScope()
+    var showImportDialog by remember { mutableStateOf(false) }
+    var pendingImportContent by remember { mutableStateOf<String?>(null) }
+    var pendingImportSummary by remember { mutableStateOf<ImportSummary?>(null) }
+    var isExporting by remember { mutableStateOf(false) }
+    var isImporting by remember { mutableStateOf(false) }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri != null) {
+            isExporting = true
+            scope.launch(Dispatchers.IO) {
+                try {
+                    val json = db.exportToJson()
+                    context.contentResolver.openOutputStream(uri)?.use { out ->
+                        out.write(json.toByteArray(Charsets.UTF_8))
+                    } ?: throw IllegalStateException("Could not open file for writing")
+                    launch(Dispatchers.Main) {
+                        isExporting = false
+                        Toast.makeText(context, "Data exported successfully", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {
+                    launch(Dispatchers.Main) {
+                        isExporting = false
+                        Toast.makeText(context, "Export failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            isImporting = true
+            scope.launch(Dispatchers.IO) {
+                try {
+                    val content = context.contentResolver.openInputStream(uri)?.use { input ->
+                        input.bufferedReader().readText()
+                    } ?: throw IllegalStateException("Could not read selected file")
+                    val summary = db.parseBackupSummary(content)
+                    launch(Dispatchers.Main) {
+                        isImporting = false
+                        if (summary == null) {
+                            Toast.makeText(context, "Invalid Gene backup file", Toast.LENGTH_SHORT).show()
+                        } else {
+                            pendingImportContent = content
+                            pendingImportSummary = summary
+                            showImportDialog = true
+                        }
+                    }
+                } catch (e: Exception) {
+                    launch(Dispatchers.Main) {
+                        isImporting = false
+                        Toast.makeText(context, "Import failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    }
+
     Scaffold(topBar = { TopAppBar(title = { Text("Settings", style = MaterialTheme.typography.titleMedium) }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, "Back") } }) }) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(0.dp)) {
             item { Spacer(Modifier.height(18.dp)); SettingsSectionTitle("Appearance", "Keep Gene quiet and focused") }
@@ -1103,6 +1177,36 @@ private fun SettingsScreen(dark: Boolean, onToggleTheme: () -> Unit, onBack: () 
                 Spacer(Modifier.height(14.dp))
                 Button(onClick = { prefs.edit().putString("llm_endpoint", endpoint.trim()).putString("llm_model", model.trim()).putString("llm_api_key", apiKey.trim()).apply(); saved = true }, modifier = Modifier.fillMaxWidth()) { Text(if (saved) "Saved" else "Save intelligence settings") }
             } }
+            item { Spacer(Modifier.height(28.dp)); SettingsSectionTitle("Data & Backup", "Export your memories or restore from a file") }
+            item { SettingsCard {
+                Text("Export creates a complete JSON backup containing all people, memories, and conversations. Import restores or merges records back into Gene.", color = GeneGray, style = MaterialTheme.typography.bodyLarge)
+                Spacer(Modifier.height(14.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(
+                        onClick = {
+                            val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())
+                            exportLauncher.launch("gene_backup_$timestamp.json")
+                        },
+                        modifier = Modifier.weight(1f),
+                        enabled = !isExporting && !isImporting
+                    ) {
+                        Icon(Icons.Outlined.FileDownload, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (isExporting) "Exporting..." else "Export data")
+                    }
+                    Button(
+                        onClick = {
+                            importLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
+                        },
+                        modifier = Modifier.weight(1f),
+                        enabled = !isExporting && !isImporting
+                    ) {
+                        Icon(Icons.Outlined.FileUpload, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (isImporting) "Reading..." else "Import data")
+                    }
+                }
+            } }
             item { Spacer(Modifier.height(28.dp)); SettingsSectionTitle("Privacy", "Your context stays yours") }
             item { SettingsCard {
                 Text("Gene saves people, notes, transcripts, sessions, and message references locally on this device. It does not record continuously. Audio is used only to create a transcript when you choose Audio memory.", color = GeneGray, style = MaterialTheme.typography.bodyLarge)
@@ -1111,6 +1215,85 @@ private fun SettingsScreen(dark: Boolean, onToggleTheme: () -> Unit, onBack: () 
             } }
             item { Spacer(Modifier.height(34.dp)) }
         }
+    }
+
+    if (showImportDialog && pendingImportSummary != null) {
+        val summary = pendingImportSummary!!
+        AlertDialog(
+            onDismissRequest = {
+                showImportDialog = false
+                pendingImportContent = null
+                pendingImportSummary = null
+            },
+            title = { Text("Import data", style = MaterialTheme.typography.titleMedium) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("This backup contains:", style = MaterialTheme.typography.bodyMedium)
+                    Text("• ${summary.peopleCount} ${if (summary.peopleCount == 1) "person" else "people"}", color = GeneGray, style = MaterialTheme.typography.bodyMedium)
+                    Text("• ${summary.memoryCount} ${if (summary.memoryCount == 1) "memory" else "memories"}", color = GeneGray, style = MaterialTheme.typography.bodyMedium)
+                    Text("• ${summary.sessionCount} ${if (summary.sessionCount == 1) "conversation" else "conversations"} (${summary.messageCount} messages)", color = GeneGray, style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.height(6.dp))
+                    Text("How would you like to import this backup?", style = MaterialTheme.typography.bodyMedium)
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    val content = pendingImportContent ?: return@Button
+                    showImportDialog = false
+                    scope.launch(Dispatchers.IO) {
+                        try {
+                            val result = db.importFromJson(content, replaceExisting = false)
+                            launch(Dispatchers.Main) {
+                                onDataChanged()
+                                Toast.makeText(context, "Merged ${result.peopleCount} people and ${result.memoryCount} memories", Toast.LENGTH_SHORT).show()
+                            }
+                        } catch (e: Exception) {
+                            launch(Dispatchers.Main) {
+                                Toast.makeText(context, "Import failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        } finally {
+                            pendingImportContent = null
+                            pendingImportSummary = null
+                        }
+                    }
+                }) {
+                    Text("Merge")
+                }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = {
+                        showImportDialog = false
+                        pendingImportContent = null
+                        pendingImportSummary = null
+                    }) {
+                        Text("Cancel")
+                    }
+                    OutlinedButton(onClick = {
+                        val content = pendingImportContent ?: return@OutlinedButton
+                        showImportDialog = false
+                        scope.launch(Dispatchers.IO) {
+                            try {
+                                val result = db.importFromJson(content, replaceExisting = true)
+                                launch(Dispatchers.Main) {
+                                    onDataChanged()
+                                    Toast.makeText(context, "Restored ${result.peopleCount} people and ${result.memoryCount} memories", Toast.LENGTH_SHORT).show()
+                                }
+                            } catch (e: Exception) {
+                                launch(Dispatchers.Main) {
+                                    Toast.makeText(context, "Import failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            } finally {
+                                pendingImportContent = null
+                                pendingImportSummary = null
+                            }
+                        }
+                    }) {
+                        Text("Replace all")
+                    }
+                }
+            }
+        )
     }
 }
 
