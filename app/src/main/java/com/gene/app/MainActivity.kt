@@ -501,8 +501,7 @@ private fun PersonScreen(person: Person, memories: List<Interaction>, dark: Bool
             }
                 item { Spacer(Modifier.height(90.dp)) }
             }
-            Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().imePadding()) {
-                Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(96.dp).background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.14f)))))
+            Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().imePadding()) {
                 MemoryComposer(person, db, onSaved = onChanged, onStartChat = { onOpenChat(null, CHAT_TALK) })
             }
         }
@@ -582,15 +581,68 @@ private fun MemoryComposer(person: Person, db: GeneDatabase, onSaved: () -> Unit
             }
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Surface(Modifier.weight(1f), shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surface, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
+            Surface(
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 6.dp,
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+            ) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(value = text, onValueChange = { text = it; showModes = true }, placeholder = { Text(placeholder) }, singleLine = mode != "signal" && mode != "pattern", maxLines = 4, modifier = Modifier.weight(1f).onFocusChanged { showModes = it.isFocused }, colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(unfocusedBorderColor = Color.Transparent, focusedBorderColor = Color.Transparent))
+                    OutlinedTextField(
+                        value = text,
+                        onValueChange = { text = it; showModes = true },
+                        placeholder = { Text(placeholder) },
+                        singleLine = mode != "signal" && mode != "pattern",
+                        maxLines = 4,
+                        modifier = Modifier.weight(1f).onFocusChanged { showModes = it.isFocused },
+                        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                            unfocusedBorderColor = Color.Transparent,
+                            focusedBorderColor = Color.Transparent,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                            focusedContainerColor = MaterialTheme.colorScheme.surface
+                        )
+                    )
                     if (mode == TYPE_AUDIO) IconButton(onClick = { toggleRecording() }) { Icon(if (recording) Icons.Outlined.Stop else Icons.Outlined.KeyboardVoice, if (recording) "Stop recording" else "Record memory") }
                 }
             }
-            Surface(onClick = { if (canSend) saveMemory() else onStartChat() }, enabled = canSend || !recording, modifier = Modifier.size(56.dp), shape = CircleShape, color = MaterialTheme.colorScheme.surface, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) { Box(contentAlignment = Alignment.Center) { Icon(if (canSend) Icons.Outlined.Send else Icons.Outlined.SmartToy, if (canSend) "Save memory" else "Start a new chat") } }
+            Surface(
+                onClick = { if (canSend) saveMemory() else onStartChat() },
+                enabled = canSend || !recording,
+                modifier = Modifier.size(56.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 6.dp,
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(if (canSend) Icons.Outlined.Send else Icons.Outlined.SmartToy, if (canSend) "Save memory" else "Start a new chat")
+                }
+            }
         }
-        if (mode == "signal" && showModes) OutlinedTextField(value = secondText, onValueChange = { secondText = it }, label = { Text("What might it mean? Optional") }, minLines = 2, modifier = Modifier.fillMaxWidth())
+        if (mode == "signal" && showModes) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 4.dp,
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+            ) {
+                OutlinedTextField(
+                    value = secondText,
+                    onValueChange = { secondText = it },
+                    label = { Text("What might it mean? Optional") },
+                    minLines = 2,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                        focusedContainerColor = MaterialTheme.colorScheme.surface
+                    )
+                )
+            }
+        }
     }
 }
 
