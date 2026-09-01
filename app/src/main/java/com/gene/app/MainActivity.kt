@@ -435,7 +435,14 @@ private fun PersonScreen(person: Person, memories: List<Interaction>, dark: Bool
         TopAppBar(title = { Text(person.name, style = MaterialTheme.typography.titleMedium) }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, "Back") } }, actions = { IconButton(onClick = onSearch) { Icon(Icons.Outlined.Search, "Search memories and chats") }; Box { IconButton(onClick = { personaMenuOpen = true }) { Icon(Icons.Outlined.MoreVert, "Person actions") }; DropdownMenu(expanded = personaMenuOpen, onDismissRequest = { personaMenuOpen = false }) { DropdownMenuItem(text = { Text(if (personFavorite) "Unfavorite" else "Favorite") }, leadingIcon = { Icon(if (personFavorite) Icons.Outlined.Star else Icons.Outlined.StarBorder, null) }, onClick = { personFavorite = !personFavorite; db.setPersonFavorite(person.id, personFavorite); personaMenuOpen = false; onChanged() }); DropdownMenuItem(text = { Text("Rename") }, leadingIcon = { Icon(Icons.Outlined.Edit, null) }, onClick = { personaMenuOpen = false; renameOpen = true }); DropdownMenuItem(text = { Text("Delete") }, leadingIcon = { Icon(Icons.Outlined.DeleteOutline, null) }, onClick = { personaMenuOpen = false; showDelete = true }) } } })
     }) { padding ->
         Box(Modifier.fillMaxSize()) {
-            LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal = 22.dp).padding(bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = padding.calculateTopPadding())
+                    .padding(horizontal = 22.dp),
+                contentPadding = PaddingValues(bottom = 120.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
             item {
                 Spacer(Modifier.height(16.dp))
                 if (memories.size >= 10) {
@@ -499,7 +506,6 @@ private fun PersonScreen(person: Person, memories: List<Interaction>, dark: Bool
             } else {
                 items(memories.take(10), key = { it.id }) { memory -> MemoryCard(memory, onClick = { onMemory(memory.id) }) }
             }
-                item { Spacer(Modifier.height(90.dp)) }
             }
             Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().imePadding()) {
                 MemoryComposer(person, db, onSaved = onChanged, onStartChat = { onOpenChat(null, CHAT_TALK) })
