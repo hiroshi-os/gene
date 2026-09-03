@@ -122,6 +122,25 @@ class GeneDatabase(context: Context) : SQLiteOpenHelper(context, "gene.db", null
 
     fun latestInteractions(): Map<Long, Interaction> = readableDatabase.rawQuery("SELECT id, person_id, type, body, created_at, audio_uri, transcript, transcription_status FROM interactions WHERE id IN (SELECT MAX(id) FROM interactions GROUP BY person_id)", null).use { c -> buildMap { while (c.moveToNext()) { val i = readInteraction(c); put(i.personId, i) } } }
 
+    fun allRecentInteractions(limit: Int = 50): List<Pair<Interaction, Person>> = readableDatabase.rawQuery(
+        """
+        SELECT i.id, i.person_id, i.type, i.body, i.created_at, i.audio_uri, i.transcript, i.transcription_status,
+               p.id, p.name, p.note, p.created_at, p.last_seen, (SELECT COUNT(*) FROM interactions WHERE person_id = p.id), p.summary, p.summary_memory_count, p.favorite
+        FROM interactions i
+        JOIN people p ON i.person_id = p.id
+        ORDER BY i.created_at DESC
+        LIMIT ?
+        """.trimIndent(), arrayOf(limit.toString())
+    ).use { c ->
+        buildList {
+            while (c.moveToNext()) {
+                val interaction = Interaction(c.getLong(0), c.getLong(1), c.getString(2), c.getString(3), c.getLong(4), if (c.isNull(5)) null else c.getString(5), if (c.isNull(6)) null else c.getString(6), c.getString(7))
+                val person = Person(c.getLong(8), c.getString(9), c.getString(10), c.getLong(11), c.getLong(12), c.getInt(13), if (c.isNull(14)) null else c.getString(14), c.getInt(15), c.getInt(16) == 1)
+                add(interaction to person)
+            }
+        }
+    }
+
     fun interaction(id: Long): Interaction? = readableDatabase.rawQuery("SELECT id, person_id, type, body, created_at, audio_uri, transcript, transcription_status FROM interactions WHERE id = ?", arrayOf(id.toString())).use { c -> if (c.moveToFirst()) readInteraction(c) else null }
 
     private fun readInteraction(c: android.database.Cursor): Interaction = Interaction(c.getLong(0), c.getLong(1), c.getString(2), c.getString(3), c.getLong(4), if (c.isNull(5)) null else c.getString(5), if (c.isNull(6)) null else c.getString(6), c.getString(7))
