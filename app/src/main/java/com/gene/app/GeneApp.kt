@@ -88,7 +88,8 @@ fun GeneApp(initialPersonId: Long = -1L) {
                     refresh++
                     screen = AppScreen.PersonDetail(id)
                 },
-                onRefresh = { refresh++ }
+                onRefresh = { refresh++ },
+                db = db
             )
             is AppScreen.PersonDetail -> {
                 val person = db.person(current.id)

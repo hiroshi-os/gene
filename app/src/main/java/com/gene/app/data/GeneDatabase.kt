@@ -118,6 +118,10 @@ class GeneDatabase(context: Context) : SQLiteOpenHelper(context, "gene.db", null
 
     fun interactions(personId: Long): List<Interaction> = readableDatabase.rawQuery("SELECT id, person_id, type, body, created_at, audio_uri, transcript, transcription_status FROM interactions WHERE person_id = ? ORDER BY created_at DESC", arrayOf(personId.toString())).use { c -> buildList { while (c.moveToNext()) add(readInteraction(c)) } }
 
+    fun latestInteraction(personId: Long): Interaction? = readableDatabase.rawQuery("SELECT id, person_id, type, body, created_at, audio_uri, transcript, transcription_status FROM interactions WHERE person_id = ? ORDER BY created_at DESC LIMIT 1", arrayOf(personId.toString())).use { c -> if (c.moveToFirst()) readInteraction(c) else null }
+
+    fun latestInteractions(): Map<Long, Interaction> = readableDatabase.rawQuery("SELECT id, person_id, type, body, created_at, audio_uri, transcript, transcription_status FROM interactions WHERE id IN (SELECT MAX(id) FROM interactions GROUP BY person_id)", null).use { c -> buildMap { while (c.moveToNext()) { val i = readInteraction(c); put(i.personId, i) } } }
+
     fun interaction(id: Long): Interaction? = readableDatabase.rawQuery("SELECT id, person_id, type, body, created_at, audio_uri, transcript, transcription_status FROM interactions WHERE id = ?", arrayOf(id.toString())).use { c -> if (c.moveToFirst()) readInteraction(c) else null }
 
     private fun readInteraction(c: android.database.Cursor): Interaction = Interaction(c.getLong(0), c.getLong(1), c.getString(2), c.getString(3), c.getLong(4), if (c.isNull(5)) null else c.getString(5), if (c.isNull(6)) null else c.getString(6), c.getString(7))
