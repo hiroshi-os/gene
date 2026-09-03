@@ -277,13 +277,12 @@ fun ChatBubble(
     val isUser = message.role == ROLE_USER
     Column(Modifier.fillMaxWidth(), horizontalAlignment = if (isUser) Alignment.End else Alignment.Start) {
         Surface(
-            color = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-            contentColor = if (isUser) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-            shape = RoundedCornerShape(18.dp),
-            border = if (isUser) null else androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-            modifier = Modifier.widthIn(max = 340.dp)
+            color = if (isUser) Color(0xFF007AFF) else MaterialTheme.colorScheme.surface,
+            contentColor = if (isUser) Color.White else MaterialTheme.colorScheme.onSurface,
+            shape = if (isUser) RoundedCornerShape(18.dp, 18.dp, 4.dp, 18.dp) else RoundedCornerShape(18.dp, 18.dp, 18.dp, 4.dp),
+            modifier = Modifier.widthIn(max = 320.dp)
         ) {
-            Column(Modifier.padding(horizontal = 17.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(message.body, style = MaterialTheme.typography.bodyLarge)
                 if (!isUser && message.confidence != null) {
                     Text(

@@ -4,7 +4,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,10 +26,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Face
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Search
@@ -42,7 +43,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -51,6 +51,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -74,6 +75,10 @@ import com.gene.app.data.GeneDatabase
 import com.gene.app.data.Interaction
 import com.gene.app.data.Person
 import com.gene.app.data.TYPE_AUDIO
+import com.gene.app.ui.common.AcrylicTabBar
+import com.gene.app.ui.common.MemojiAvatar
+import com.gene.app.ui.common.MemojiConfig
+import com.gene.app.ui.common.MemojiMakerSheet
 import com.gene.app.ui.common.asIMessageTime
 import com.gene.app.ui.theme.GeneBlack
 import com.gene.app.ui.theme.GeneWhite
@@ -92,38 +97,42 @@ import com.gene.app.ui.theme.IosLightSecondary
 @Composable
 fun HomeScreen(
     people: List<Person>,
+    dark: Boolean,
     onPerson: (Long) -> Unit,
     onSettings: () -> Unit,
     onPersonCreated: (String, String) -> Unit,
     onRefresh: () -> Unit,
     db: GeneDatabase? = null
 ) {
+    var selectedTab by remember { mutableIntStateOf(0) } // 0 = Messages, 1 = Contacts
     var showNewMessage by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var isSearchActive by remember { mutableStateOf(false) }
     var editMenuExpanded by remember { mutableStateOf(false) }
+
+    // Memoji customizer state
+    var personForMemoji by remember { mutableStateOf<Person?>(null) }
 
     // Long press / Action sheet state
     var selectedPersonForAction by remember { mutableStateOf<Person?>(null) }
     var editingPerson by remember { mutableStateOf<Person?>(null) }
     var personToDelete by remember { mutableStateOf<Person?>(null) }
 
-    val isDark = isSystemInDarkTheme() || MaterialTheme.colorScheme.background == IosDarkBg
     val latestInteractions = remember(people) { db?.latestInteractions().orEmpty() }
 
-    // Theme-aware iMessage tokens
-    val bg = if (isDark) IosDarkBg else IosLightBg
-    val textPrimary = if (isDark) GeneWhite else GeneBlack
-    val textSecondary = if (isDark) IosDarkSecondary else IosLightSecondary
-    val dividerColor = if (isDark) IosDarkDivider else IosLightDivider
-    val accentBlue = if (isDark) IosDarkBlue else IosBlue
-    val avatarBg = if (isDark) IosDarkAvatar else IosLightAvatar
+    // Theme-aware Apple iMessage / Contacts tokens
+    val bg = if (dark) IosDarkBg else IosLightBg
+    val textPrimary = if (dark) GeneWhite else GeneBlack
+    val textSecondary = if (dark) IosDarkSecondary else IosLightSecondary
+    val dividerColor = if (dark) IosDarkDivider else IosLightDivider
+    val accentBlue = if (dark) IosDarkBlue else IosBlue
+    val avatarBg = if (dark) IosDarkAvatar else IosLightAvatar
 
-    // Frosted glass tokens for floating items
-    val frostedHeaderBg = if (isDark) Color(0xE0000000) else Color(0xEAFFFFFF)
-    val frostedSearchPillBg = if (isDark) Color(0x3D767680) else Color(0x1F767680)
-    val frostedMenuBg = if (isDark) Color(0xEA1C1C1E) else Color(0xF4F2F2F7)
-    val frostedSheetBg = if (isDark) Color(0xF01C1C1E) else Color(0xF6FFFFFF)
+    // Frosted acrylic glass tokens
+    val frostedHeaderBg = if (dark) Color(0xE0000000) else Color(0xEBFFFFFF)
+    val frostedSearchPillBg = if (dark) Color(0x3D767680) else Color(0x1F767680)
+    val frostedMenuBg = if (dark) Color(0xEA1C1C1E) else Color(0xF4F2F2F7)
+    val frostedSheetBg = if (dark) Color(0xF01C1C1E) else Color(0xF6FFFFFF)
 
     val pinnedPeople = remember(people) { people.filter { it.favorite } }
     val filteredPeople = remember(people, searchQuery) {
@@ -138,98 +147,115 @@ fun HomeScreen(
             .fillMaxSize()
             .background(bg)
     ) {
-        // 1. Scrolling Content Underneath
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = 108.dp, bottom = 40.dp)
-        ) {
-            // iOS Large Title: "Messages"
-            item {
-                Text(
-                    text = "Messages",
-                    color = textPrimary,
-                    fontSize = 34.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = (-0.5).sp,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
-                )
-            }
-
-            // iMessage Pinned Contacts Carousel (Floating Bubbles)
-            if (pinnedPeople.isNotEmpty() && searchQuery.isEmpty()) {
+        // Main Content: Messages (Tab 0) or Contacts (Tab 1)
+        if (selectedTab == 0) {
+            // PAGE 1: APPLE IMESSAGES
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(top = 108.dp, bottom = 90.dp)
+            ) {
+                // iOS Large Navigation Title: "Messages"
                 item {
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(18.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        items(pinnedPeople, key = { "pinned_${it.id}" }) { person ->
-                            IMessagePinnedContact(
-                                person = person,
-                                latestInteraction = latestInteractions[person.id],
-                                isDark = isDark,
-                                avatarBg = avatarBg,
-                                textPrimary = textPrimary,
-                                textSecondary = textSecondary,
-                                onClick = { onPerson(person.id) },
-                                onLongClick = { selectedPersonForAction = person }
-                            )
-                        }
-                    }
-                    HorizontalDivider(color = dividerColor, thickness = 0.5.dp)
+                    Text(
+                        text = "Messages",
+                        color = textPrimary,
+                        fontSize = 34.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = (-0.5).sp,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
+                    )
                 }
-            }
 
-            // Empty State
-            if (filteredPeople.isEmpty()) {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 80.dp, start = 32.dp, end = 32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                // iMessage Pinned Contacts Carousel (Floating Memoji Bubbles)
+                if (pinnedPeople.isNotEmpty() && searchQuery.isEmpty()) {
+                    item {
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(18.dp),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(
-                                if (searchQuery.isNotBlank()) "No Results for \"$searchQuery\"" else "No Messages",
-                                color = textSecondary,
-                                fontSize = 17.sp,
-                                fontWeight = FontWeight.Normal
-                            )
-                            if (searchQuery.isEmpty()) {
-                                TextButton(
-                                    onClick = { showNewMessage = true },
-                                    colors = ButtonDefaults.textButtonColors(contentColor = accentBlue)
-                                ) {
-                                    Text("Start a conversation", fontSize = 16.sp)
+                            items(pinnedPeople, key = { "pinned_${it.id}" }) { person ->
+                                IMessagePinnedContact(
+                                    person = person,
+                                    latestInteraction = latestInteractions[person.id],
+                                    isDark = dark,
+                                    avatarBg = avatarBg,
+                                    textPrimary = textPrimary,
+                                    onClick = { onPerson(person.id) },
+                                    onLongClick = { selectedPersonForAction = person }
+                                )
+                            }
+                        }
+                        HorizontalDivider(color = dividerColor, thickness = 0.5.dp)
+                    }
+                }
+
+                // Empty State
+                if (filteredPeople.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 80.dp, start = 32.dp, end = 32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(14.dp)
+                            ) {
+                                Text(
+                                    if (searchQuery.isNotBlank()) "No Results for \"$searchQuery\"" else "No Messages",
+                                    color = textSecondary,
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.Normal
+                                )
+                                if (searchQuery.isEmpty()) {
+                                    TextButton(
+                                        onClick = { showNewMessage = true },
+                                        colors = ButtonDefaults.textButtonColors(contentColor = accentBlue)
+                                    ) {
+                                        Text("Start a conversation", fontSize = 16.sp)
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
 
-            // Conversation Rows
-            items(filteredPeople, key = { it.id }) { person ->
-                IMessageChatRow(
-                    person = person,
-                    latestInteraction = latestInteractions[person.id],
-                    isDark = isDark,
-                    textPrimary = textPrimary,
-                    textSecondary = textSecondary,
-                    dividerColor = dividerColor,
-                    accentBlue = accentBlue,
-                    avatarBg = avatarBg,
-                    onClick = { onPerson(person.id) },
-                    onLongClick = { selectedPersonForAction = person }
-                )
+                // Conversation Rows
+                items(filteredPeople, key = { it.id }) { person ->
+                    IMessageChatRow(
+                        person = person,
+                        latestInteraction = latestInteractions[person.id],
+                        isDark = dark,
+                        textPrimary = textPrimary,
+                        textSecondary = textSecondary,
+                        dividerColor = dividerColor,
+                        accentBlue = accentBlue,
+                        avatarBg = avatarBg,
+                        onClick = { onPerson(person.id) },
+                        onLongClick = { selectedPersonForAction = person }
+                    )
+                }
             }
+        } else {
+            // PAGE 2: APPLE CONTACTS
+            AppleContactsView(
+                people = filteredPeople,
+                dark = dark,
+                textPrimary = textPrimary,
+                textSecondary = textSecondary,
+                dividerColor = dividerColor,
+                accentBlue = accentBlue,
+                avatarBg = avatarBg,
+                searchQuery = searchQuery,
+                onPersonClick = onPerson,
+                onAddPerson = { showNewMessage = true },
+                onCustomizeMemoji = { personForMemoji = it }
+            )
         }
 
-        // 2. Floating Frosted Glass Header (Top Bar + Search Bar)
+        // Floating Frosted Glass Header (Top Bar + Search Bar)
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -247,7 +273,7 @@ fun HomeScreen(
                 .statusBarsPadding()
                 .padding(bottom = 8.dp)
         ) {
-            // Top Navigation Action Row: Edit on left, Compose on right
+            // Top Navigation Action Row
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -260,7 +286,7 @@ fun HomeScreen(
                         onClick = { editMenuExpanded = true },
                         colors = ButtonDefaults.textButtonColors(contentColor = accentBlue)
                     ) {
-                        Text("Edit", fontSize = 17.sp, fontWeight = FontWeight.Normal)
+                        Text(if (selectedTab == 0) "Edit" else "Groups", fontSize = 17.sp, fontWeight = FontWeight.Normal)
                     }
                     DropdownMenu(
                         expanded = editMenuExpanded,
@@ -270,25 +296,17 @@ fun HomeScreen(
                             .background(frostedMenuBg)
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Select Messages", color = textPrimary) },
-                            onClick = { editMenuExpanded = false }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Edit Pins", color = textPrimary) },
-                            onClick = { editMenuExpanded = false }
-                        )
-                        DropdownMenuItem(
                             text = { Text("Settings", color = textPrimary) },
                             onClick = { editMenuExpanded = false; onSettings() }
                         )
                     }
                 }
 
-                // iOS Compose Icon (Pencil in Box)
+                // Top Right Action: Compose Message or Add Contact
                 IconButton(onClick = { showNewMessage = true }) {
                     Icon(
-                        Icons.Outlined.Edit,
-                        contentDescription = "New Message",
+                        if (selectedTab == 0) Icons.Outlined.Edit else Icons.Outlined.Add,
+                        contentDescription = if (selectedTab == 0) "New Message" else "Add Contact",
                         tint = accentBlue,
                         modifier = Modifier.size(24.dp)
                     )
@@ -369,12 +387,20 @@ fun HomeScreen(
                 }
             }
         }
+
+        // Floating Centered Shrunk Acrylic Tab Bar at the Bottom
+        AcrylicTabBar(
+            selectedTab = selectedTab,
+            onTabSelected = { selectedTab = it },
+            isDark = dark,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 
-    // Modal: iOS "New Message" Sheet with Frosted Glass Styling
+    // Modal: iOS "New Message / New Contact" Sheet
     if (showNewMessage) {
         NewMessageSheet(
-            isDark = isDark,
+            isDark = dark,
             sheetBg = frostedSheetBg,
             textPrimary = textPrimary,
             textSecondary = textSecondary,
@@ -388,11 +414,27 @@ fun HomeScreen(
         )
     }
 
-    // Modal: iOS Haptic Touch Action Sheet with Frosted Glass Styling
+    // Modal: Apple Memoji Character Maker
+    personForMemoji?.let { person ->
+        MemojiMakerSheet(
+            initialConfig = MemojiConfig.deserialize(person.avatar),
+            isDark = dark,
+            onDismiss = { personForMemoji = null },
+            onSave = { newConfig ->
+                if (db != null) {
+                    db.updatePersonAvatar(person.id, newConfig.serialize())
+                    onRefresh()
+                }
+                personForMemoji = null
+            }
+        )
+    }
+
+    // Modal: iOS Haptic Touch Action Sheet
     selectedPersonForAction?.let { person ->
         IMessageActionSheet(
             person = person,
-            isDark = isDark,
+            isDark = dark,
             sheetBg = frostedSheetBg,
             textPrimary = textPrimary,
             textSecondary = textSecondary,
@@ -408,6 +450,10 @@ fun HomeScreen(
                 editingPerson = person
                 selectedPersonForAction = null
             },
+            onCustomizeMemoji = {
+                personForMemoji = person
+                selectedPersonForAction = null
+            },
             onDelete = {
                 personToDelete = person
                 selectedPersonForAction = null
@@ -419,7 +465,7 @@ fun HomeScreen(
     editingPerson?.let { person ->
         EditPersonDialog(
             person = person,
-            isDark = isDark,
+            isDark = dark,
             textPrimary = textPrimary,
             textSecondary = textSecondary,
             accentBlue = accentBlue,
@@ -439,8 +485,8 @@ fun HomeScreen(
     personToDelete?.let { person ->
         AlertDialog(
             onDismissRequest = { personToDelete = null },
-            title = { Text("Delete Conversation?", color = textPrimary, fontWeight = FontWeight.Bold) },
-            text = { Text("Deleting will remove all conversation history with ${person.name}.", color = textSecondary) },
+            title = { Text("Delete Contact?", color = textPrimary, fontWeight = FontWeight.Bold) },
+            text = { Text("Deleting will remove all recorded memories and chat history with ${person.name}.", color = textSecondary) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -459,13 +505,174 @@ fun HomeScreen(
                     Text("Cancel", color = accentBlue)
                 }
             },
-            containerColor = if (isDark) Color(0xFF1C1C1E) else Color(0xFFF2F2F7)
+            containerColor = if (dark) Color(0xFF1C1C1E) else Color(0xFFF2F2F7)
         )
     }
 }
 
 /**
- * iMessage Pinned Contact Avatar with Frosted Glass Floating Speech Bubble
+ * Apple Contacts Page with Alphabetical Sections and "My Card" Header
+ */
+@Composable
+fun AppleContactsView(
+    people: List<Person>,
+    dark: Boolean,
+    textPrimary: Color,
+    textSecondary: Color,
+    dividerColor: Color,
+    accentBlue: Color,
+    avatarBg: Color,
+    searchQuery: String,
+    onPersonClick: (Long) -> Unit,
+    onAddPerson: () -> Unit,
+    onCustomizeMemoji: (Person) -> Unit
+) {
+    // Group people alphabetically
+    val grouped = remember(people) {
+        people.sortedBy { it.name.lowercase() }
+            .groupBy { it.name.firstOrNull()?.uppercaseChar() ?: '#' }
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(top = 108.dp, bottom = 90.dp)
+    ) {
+        // iOS Large Title: "Contacts"
+        item {
+            Text(
+                text = "Contacts",
+                color = textPrimary,
+                fontSize = 34.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = (-0.5).sp,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
+            )
+        }
+
+        // "My Card" Header (Apple Contacts style)
+        if (searchQuery.isEmpty()) {
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    MemojiAvatar(
+                        config = MemojiConfig(bgColor = accentBlue),
+                        size = 56.dp
+                    )
+                    Spacer(Modifier.width(16.dp))
+                    Column {
+                        Text(
+                            text = "My Card",
+                            color = textPrimary,
+                            fontSize = 19.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "Tap to view profile & Memoji",
+                            color = textSecondary,
+                            fontSize = 13.sp
+                        )
+                    }
+                }
+                HorizontalDivider(color = dividerColor, thickness = 0.5.dp)
+            }
+        }
+
+        // Alphabetical Contact Sections (A, B, C...)
+        grouped.forEach { (letter, contactsInGroup) ->
+            item {
+                Text(
+                    text = letter.toString(),
+                    color = textSecondary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+
+            items(contactsInGroup, key = { it.id }) { person ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onPersonClick(person.id) }
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Contact Memoji or Circular Initial
+                    if (!person.avatar.isNullOrBlank()) {
+                        MemojiAvatar(
+                            config = MemojiConfig.deserialize(person.avatar),
+                            size = 40.dp
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(avatarBg),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = person.name.take(1).uppercase(),
+                                color = Color.White,
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.width(14.dp))
+
+                    Text(
+                        text = person.name,
+                        color = textPrimary,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    // Quick Memoji customizer button
+                    IconButton(
+                        onClick = { onCustomizeMemoji(person) },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Outlined.Face,
+                            contentDescription = "Edit Memoji",
+                            tint = textSecondary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+                HorizontalDivider(modifier = Modifier.padding(start = 70.dp), color = dividerColor, thickness = 0.5.dp)
+            }
+        }
+
+        // Contact Count Footer
+        item {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "${people.size} Contacts",
+                    color = textSecondary,
+                    fontSize = 14.sp
+                )
+            }
+        }
+    }
+}
+
+/**
+ * iMessage Pinned Contact Avatar with Floating Speech Bubble
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -475,14 +682,11 @@ fun IMessagePinnedContact(
     isDark: Boolean,
     avatarBg: Color,
     textPrimary: Color,
-    textSecondary: Color,
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
     val previewText = latestInteraction?.body?.take(22) ?: person.note.take(22)
-
-    // Frosted glass speech bubble background
     val frostedBubbleBg = if (isDark) Color(0xCC2C2C2E) else Color(0xD8E5E5EA)
 
     Column(
@@ -517,20 +721,27 @@ fun IMessagePinnedContact(
             Spacer(Modifier.height(4.dp))
         }
 
-        // Large 64dp Circle Avatar
-        Box(
-            modifier = Modifier
-                .size(64.dp)
-                .clip(CircleShape)
-                .background(avatarBg),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = person.name.take(1).uppercase(),
-                color = Color.White,
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Bold
+        // 64dp Circular Memoji / Avatar
+        if (!person.avatar.isNullOrBlank()) {
+            MemojiAvatar(
+                config = MemojiConfig.deserialize(person.avatar),
+                size = 64.dp
             )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(avatarBg),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = person.name.take(1).uppercase(),
+                    color = Color.White,
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
 
         Spacer(Modifier.height(6.dp))
@@ -609,20 +820,27 @@ fun IMessageChatRow(
                 }
             }
 
-            // Contact Avatar (48dp circle)
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(avatarBg),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = person.name.take(1).uppercase(),
-                    color = Color.White,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.SemiBold
+            // Contact Memoji / Avatar
+            if (!person.avatar.isNullOrBlank()) {
+                MemojiAvatar(
+                    config = MemojiConfig.deserialize(person.avatar),
+                    size = 48.dp
                 )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(avatarBg),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = person.name.take(1).uppercase(),
+                        color = Color.White,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
 
             Spacer(Modifier.width(12.dp))
@@ -691,7 +909,7 @@ fun IMessageChatRow(
             }
         }
 
-        // iOS Table Inset Divider (starts after avatar at 88dp)
+        // iOS Table Inset Divider
         HorizontalDivider(
             modifier = Modifier.padding(start = 88.dp),
             thickness = 0.5.dp,
@@ -701,7 +919,7 @@ fun IMessageChatRow(
 }
 
 /**
- * iOS New Message Compose Sheet with Frosted Glass Container
+ * iOS New Message Compose Sheet
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -734,7 +952,6 @@ fun NewMessageSheet(
                 .navigationBarsPadding()
                 .padding(bottom = 24.dp)
         ) {
-            // iOS Top Bar: Cancel | New Message | Done
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -765,7 +982,6 @@ fun NewMessageSheet(
 
             HorizontalDivider(color = if (isDark) IosDarkDivider else IosLightDivider, thickness = 0.5.dp)
 
-            // "To: " row
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -796,7 +1012,6 @@ fun NewMessageSheet(
 
             HorizontalDivider(color = if (isDark) IosDarkDivider else IosLightDivider, thickness = 0.5.dp)
 
-            // Optional note / context row
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -831,7 +1046,7 @@ fun NewMessageSheet(
 }
 
 /**
- * iOS Haptic Touch Context Menu Sheet with Frosted Glass Container
+ * iOS Context Action Sheet with Memoji Customization Option
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -844,6 +1059,7 @@ fun IMessageActionSheet(
     onDismiss: () -> Unit,
     onToggleFavorite: () -> Unit,
     onEdit: () -> Unit,
+    onCustomizeMemoji: () -> Unit,
     onDelete: () -> Unit
 ) {
     ModalBottomSheet(
@@ -882,6 +1098,20 @@ fun IMessageActionSheet(
                     color = textPrimary,
                     fontSize = 17.sp
                 )
+            }
+
+            // Customize Memoji
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable(onClick = onCustomizeMemoji)
+                    .padding(vertical = 12.dp, horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Outlined.Face, contentDescription = null, tint = IosBlue)
+                Spacer(Modifier.width(14.dp))
+                Text("Customize Memoji", color = IosBlue, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
             }
 
             // Edit Name

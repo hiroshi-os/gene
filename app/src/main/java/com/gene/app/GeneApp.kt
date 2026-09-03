@@ -81,6 +81,7 @@ fun GeneApp(initialPersonId: Long = -1L) {
         when (val current = screen) {
             AppScreen.Home -> HomeScreen(
                 people = people,
+                dark = dark,
                 onPerson = { screen = AppScreen.PersonDetail(it) },
                 onSettings = { screen = AppScreen.Settings },
                 onPersonCreated = { name, note ->

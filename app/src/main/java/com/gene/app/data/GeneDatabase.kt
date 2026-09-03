@@ -19,13 +19,13 @@ const val TRANSCRIPTION_PENDING = "pending"
 const val TRANSCRIPTION_COMPLETE = "complete"
 const val TRANSCRIPTION_UNAVAILABLE = "unavailable"
 
-data class Person(val id: Long, val name: String, val note: String, val createdAt: Long, val lastSeen: Long, val interactionCount: Int, val summary: String?, val summaryMemoryCount: Int, val favorite: Boolean = false)
+data class Person(val id: Long, val name: String, val note: String, val createdAt: Long, val lastSeen: Long, val interactionCount: Int, val summary: String?, val summaryMemoryCount: Int, val favorite: Boolean = false, val avatar: String? = null)
 data class Interaction(val id: Long, val personId: Long, val type: String, val body: String, val createdAt: Long, val audioUri: String? = null, val transcript: String? = null, val transcriptionStatus: String = TRANSCRIPTION_NONE)
 data class ChatSession(val id: Long, val personId: Long, val title: String, val createdAt: Long, val updatedAt: Long, val messageCount: Int, val favorite: Boolean, val mode: String = "talk")
 data class ChatMessage(val id: Long, val sessionId: Long, val role: String, val body: String, val createdAt: Long, val confidence: Int?, val referenceIds: List<Long>)
 data class ImportSummary(val peopleCount: Int, val memoryCount: Int, val sessionCount: Int, val messageCount: Int)
 
-class GeneDatabase(context: Context) : SQLiteOpenHelper(context, "gene.db", null, 8) {
+class GeneDatabase(context: Context) : SQLiteOpenHelper(context, "gene.db", null, 9) {
     override fun onConfigure(db: SQLiteDatabase) { db.setForeignKeyConstraintsEnabled(true) }
 
     override fun onCreate(db: SQLiteDatabase) {
@@ -51,10 +51,11 @@ class GeneDatabase(context: Context) : SQLiteOpenHelper(context, "gene.db", null
         }
         if (oldVersion < 7) db.execSQL("ALTER TABLE sessions ADD COLUMN mode TEXT NOT NULL DEFAULT 'talk'")
         if (oldVersion < 8) db.execSQL("ALTER TABLE people ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0")
+        if (oldVersion < 9) db.execSQL("ALTER TABLE people ADD COLUMN avatar TEXT")
     }
 
     private fun createPeopleAndMemories(db: SQLiteDatabase) {
-        db.execSQL("CREATE TABLE IF NOT EXISTS people (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, note TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, last_seen INTEGER NOT NULL, summary TEXT, summary_memory_count INTEGER NOT NULL DEFAULT 0, favorite INTEGER NOT NULL DEFAULT 0)")
+        db.execSQL("CREATE TABLE IF NOT EXISTS people (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, note TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, last_seen INTEGER NOT NULL, summary TEXT, summary_memory_count INTEGER NOT NULL DEFAULT 0, favorite INTEGER NOT NULL DEFAULT 0, avatar TEXT)")
         db.execSQL("CREATE TABLE IF NOT EXISTS interactions (id INTEGER PRIMARY KEY AUTOINCREMENT, person_id INTEGER NOT NULL, type TEXT NOT NULL, body TEXT NOT NULL, created_at INTEGER NOT NULL, audio_uri TEXT, transcript TEXT, transcription_status TEXT NOT NULL DEFAULT 'none', FOREIGN KEY(person_id) REFERENCES people(id) ON DELETE CASCADE)")
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_interactions_person ON interactions(person_id, created_at DESC)")
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_interactions_type ON interactions(person_id, type, created_at DESC)")
@@ -110,11 +111,15 @@ class GeneDatabase(context: Context) : SQLiteOpenHelper(context, "gene.db", null
         writableDatabase.update("people", ContentValues().apply { put("summary", summary.trim()); put("summary_memory_count", memoryCount) }, "id = ?", arrayOf(personId.toString()))
     }
 
-    fun people(): List<Person> = readableDatabase.rawQuery("SELECT p.id, p.name, p.note, p.created_at, p.last_seen, COUNT(i.id), p.summary, p.summary_memory_count, p.favorite FROM people p LEFT JOIN interactions i ON p.id = i.person_id GROUP BY p.id ORDER BY p.favorite DESC, p.last_seen DESC", null).use { c -> buildList { while (c.moveToNext()) add(readPerson(c)) } }
+    fun updatePersonAvatar(personId: Long, avatar: String?) {
+        writableDatabase.update("people", ContentValues().apply { put("avatar", avatar) }, "id = ?", arrayOf(personId.toString()))
+    }
 
-    fun person(id: Long): Person? = readableDatabase.rawQuery("SELECT p.id, p.name, p.note, p.created_at, p.last_seen, (SELECT COUNT(*) FROM interactions WHERE person_id = p.id), p.summary, p.summary_memory_count, p.favorite FROM people p WHERE p.id = ?", arrayOf(id.toString())).use { c -> if (c.moveToFirst()) readPerson(c) else null }
+    fun people(): List<Person> = readableDatabase.rawQuery("SELECT p.id, p.name, p.note, p.created_at, p.last_seen, COUNT(i.id), p.summary, p.summary_memory_count, p.favorite, p.avatar FROM people p LEFT JOIN interactions i ON p.id = i.person_id GROUP BY p.id ORDER BY p.favorite DESC, p.last_seen DESC", null).use { c -> buildList { while (c.moveToNext()) add(readPerson(c)) } }
 
-    private fun readPerson(c: android.database.Cursor): Person = Person(c.getLong(0), c.getString(1), c.getString(2), c.getLong(3), c.getLong(4), c.getInt(5), if (c.isNull(6)) null else c.getString(6), c.getInt(7), c.getInt(8) == 1)
+    fun person(id: Long): Person? = readableDatabase.rawQuery("SELECT p.id, p.name, p.note, p.created_at, p.last_seen, (SELECT COUNT(*) FROM interactions WHERE person_id = p.id), p.summary, p.summary_memory_count, p.favorite, p.avatar FROM people p WHERE p.id = ?", arrayOf(id.toString())).use { c -> if (c.moveToFirst()) readPerson(c) else null }
+
+    private fun readPerson(c: android.database.Cursor): Person = Person(c.getLong(0), c.getString(1), c.getString(2), c.getLong(3), c.getLong(4), c.getInt(5), if (c.isNull(6)) null else c.getString(6), c.getInt(7), c.getInt(8) == 1, if (c.isNull(9)) null else c.getString(9))
 
     fun interactions(personId: Long): List<Interaction> = readableDatabase.rawQuery("SELECT id, person_id, type, body, created_at, audio_uri, transcript, transcription_status FROM interactions WHERE person_id = ? ORDER BY created_at DESC", arrayOf(personId.toString())).use { c -> buildList { while (c.moveToNext()) add(readInteraction(c)) } }
 
@@ -125,7 +130,7 @@ class GeneDatabase(context: Context) : SQLiteOpenHelper(context, "gene.db", null
     fun allRecentInteractions(limit: Int = 50): List<Pair<Interaction, Person>> = readableDatabase.rawQuery(
         """
         SELECT i.id, i.person_id, i.type, i.body, i.created_at, i.audio_uri, i.transcript, i.transcription_status,
-               p.id, p.name, p.note, p.created_at, p.last_seen, (SELECT COUNT(*) FROM interactions WHERE person_id = p.id), p.summary, p.summary_memory_count, p.favorite
+               p.id, p.name, p.note, p.created_at, p.last_seen, (SELECT COUNT(*) FROM interactions WHERE person_id = p.id), p.summary, p.summary_memory_count, p.favorite, p.avatar
         FROM interactions i
         JOIN people p ON i.person_id = p.id
         ORDER BY i.created_at DESC
@@ -135,7 +140,7 @@ class GeneDatabase(context: Context) : SQLiteOpenHelper(context, "gene.db", null
         buildList {
             while (c.moveToNext()) {
                 val interaction = Interaction(c.getLong(0), c.getLong(1), c.getString(2), c.getString(3), c.getLong(4), if (c.isNull(5)) null else c.getString(5), if (c.isNull(6)) null else c.getString(6), c.getString(7))
-                val person = Person(c.getLong(8), c.getString(9), c.getString(10), c.getLong(11), c.getLong(12), c.getInt(13), if (c.isNull(14)) null else c.getString(14), c.getInt(15), c.getInt(16) == 1)
+                val person = Person(c.getLong(8), c.getString(9), c.getString(10), c.getLong(11), c.getLong(12), c.getInt(13), if (c.isNull(14)) null else c.getString(14), c.getInt(15), c.getInt(16) == 1, if (c.isNull(17)) null else c.getString(17))
                 add(interaction to person)
             }
         }

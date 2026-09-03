@@ -1,6 +1,7 @@
 package com.gene.app.ui.person
 
 import android.content.Context
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,7 +19,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import com.gene.app.ui.common.MemojiAvatar
+import com.gene.app.ui.common.MemojiConfig
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.ChevronRight
@@ -188,8 +195,47 @@ fun PersonScreen(
                 contentPadding = PaddingValues(bottom = 120.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // Apple Contact Profile Hero (Large Memoji + Name)
                 item {
-                    Spacer(Modifier.height(16.dp))
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        if (!person.avatar.isNullOrBlank()) {
+                            MemojiAvatar(
+                                config = MemojiConfig.deserialize(person.avatar),
+                                size = 84.dp
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .size(84.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF8E8E93)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = person.name.take(1).uppercase(),
+                                    color = Color.White,
+                                    fontSize = 36.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            text = person.name,
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+                }
+
+                item {
+                    Spacer(Modifier.height(8.dp))
                     if (memories.size >= 10) {
                         Surface(
                             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f),
