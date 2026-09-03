@@ -43,6 +43,7 @@ import com.gene.app.data.GeneDatabase
 import com.gene.app.data.Person
 import com.gene.app.ui.memory.MemoryCard
 import com.gene.app.ui.theme.GeneGray
+import com.gene.app.ui.theme.IosBlue
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -66,24 +67,25 @@ fun CalendarScreen(
         })
     }
     var selectedDay by remember { mutableStateOf<String?>(null) }
-    val memories = remember(person.id) { db.interactions(person.id) }
-    val dayFormat = remember { SimpleDateFormat("yyyy-MM-dd", Locale.US) }
+    val memories = db.interactions(person.id)
+    val dayFormat = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
     val titleFormat = remember { SimpleDateFormat("MMMM yyyy", Locale.getDefault()) }
     val dayLabelFormat = remember { SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()) }
     val byDay = remember(memories) { memories.groupBy { dayFormat.format(Date(it.createdAt)) } }
-    val firstDay = remember(monthCursor.timeInMillis) { monthCursor.clone() as Calendar }
-    val offset = (firstDay.get(Calendar.DAY_OF_WEEK) - Calendar.SUNDAY)
-    val daysInMonth = firstDay.getActualMaximum(Calendar.DAY_OF_MONTH)
-    val cells = (0 until 42).map { index ->
-        val day = index - offset + 1
-        if (day in 1..daysInMonth) day else null
+
+    val daysInMonth = monthCursor.getActualMaximum(Calendar.DAY_OF_MONTH)
+    val firstDayOfWeek = monthCursor.get(Calendar.DAY_OF_WEEK)
+    val leadingBlanks = firstDayOfWeek - 1
+    val cells = buildList {
+        repeat(leadingBlanks) { add(null) }
+        for (day in 1..daysInMonth) add(day)
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Calendar · ${person.name}", style = MaterialTheme.typography.titleMedium) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, "Back") } }
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, "Back", tint = IosBlue) } }
             )
         }
     ) { padding ->
@@ -97,11 +99,11 @@ fun CalendarScreen(
             Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { monthCursor = (monthCursor.clone() as Calendar).apply { add(Calendar.MONTH, -1) } }) {
-                    Icon(Icons.Outlined.ChevronLeft, "Previous month")
+                    Icon(Icons.Outlined.ChevronLeft, "Previous month", tint = IosBlue)
                 }
                 Text(titleFormat.format(monthCursor.time), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                 IconButton(onClick = { monthCursor = (monthCursor.clone() as Calendar).apply { add(Calendar.MONTH, 1) } }) {
-                    Icon(Icons.Outlined.ChevronRight, "Next month")
+                    Icon(Icons.Outlined.ChevronRight, "Next month", tint = IosBlue)
                 }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -126,7 +128,7 @@ fun CalendarScreen(
                                 if (day != null) {
                                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                         Text(day.toString(), style = MaterialTheme.typography.bodyLarge)
-                                        if (count > 0) Box(Modifier.size(8.dp).background(MaterialTheme.colorScheme.primary, CircleShape))
+                                        if (count > 0) Box(Modifier.size(7.dp).background(IosBlue, CircleShape))
                                         if (count > 0) Text(count.toString(), color = GeneGray, style = MaterialTheme.typography.bodyMedium)
                                     }
                                 }

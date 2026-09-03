@@ -154,11 +154,11 @@ fun PersonScreen(
         topBar = {
             TopAppBar(
                 title = { Text(person.name, style = MaterialTheme.typography.titleMedium) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, "Back") } },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, "Back", tint = IosBlue) } },
                 actions = {
-                    IconButton(onClick = onSearch) { Icon(Icons.Outlined.Search, "Search memories and chats") }
+                    IconButton(onClick = onSearch) { Icon(Icons.Outlined.Search, "Search", tint = IosBlue) }
                     Box {
-                        IconButton(onClick = { personaMenuOpen = true }) { Icon(Icons.Outlined.MoreVert, "Person actions") }
+                        IconButton(onClick = { personaMenuOpen = true }) { Icon(Icons.Outlined.MoreVert, "Person actions", tint = IosBlue) }
                         DropdownMenu(expanded = personaMenuOpen, onDismissRequest = { personaMenuOpen = false }) {
                             DropdownMenuItem(
                                 text = { Text(if (personFavorite) "Unfavorite" else "Favorite") },
@@ -238,9 +238,8 @@ fun PersonScreen(
                     Spacer(Modifier.height(8.dp))
                     if (memories.size >= 10) {
                         Surface(
-                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                            shape = RoundedCornerShape(18.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            shape = RoundedCornerShape(14.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -261,7 +260,6 @@ fun PersonScreen(
                         persona.traits.forEach { trait ->
                             Surface(
                                 color = MaterialTheme.colorScheme.surface,
-                                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                                 shape = RoundedCornerShape(50),
                                 modifier = Modifier.padding(end = 2.dp)
                             ) {
@@ -401,14 +399,25 @@ fun ActionBento(
 ) {
     Surface(
         onClick = onClick,
-        modifier = modifier.height(82.dp),
+        modifier = modifier.height(72.dp),
         color = MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        shape = RoundedCornerShape(18.dp)
+        shape = RoundedCornerShape(14.dp)
     ) {
-        Column(Modifier.fillMaxSize().padding(14.dp), verticalArrangement = Arrangement.SpaceBetween) {
-            Icon(icon, title, tint = GeneGray, modifier = Modifier.size(22.dp))
-            Text(title, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Column(
+            Modifier.fillMaxSize().padding(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(icon, title, tint = IosBlue, modifier = Modifier.size(24.dp))
+            Spacer(Modifier.height(5.dp))
+            Text(
+                title,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = IosBlue,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }

@@ -64,27 +64,35 @@ import com.gene.app.data.TYPE_AUDIO
 import com.gene.app.data.TYPE_TEXT
 import com.gene.app.ui.common.asDate
 import com.gene.app.ui.theme.GeneGray
+import com.gene.app.ui.theme.IosBlue
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MemoryDetailScreen(
-    memory: Interaction,
     person: Person,
+    memory: Interaction,
     db: GeneDatabase,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
-    var playing by remember { mutableStateOf(false) }
     var player by remember { mutableStateOf<MediaPlayer?>(null) }
-    DisposableEffect(memory.id) { onDispose { player?.release(); player = null } }
+    var playing by remember { mutableStateOf(false) }
+
+    DisposableEffect(memory.id) {
+        onDispose {
+            player?.release()
+            player = null
+            playing = false
+        }
+    }
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(memoryTypeLabel(memory.type), style = MaterialTheme.typography.titleMedium) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, "Back") } },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, "Back", tint = IosBlue) } },
                 actions = {
                     IconButton(onClick = { db.deleteInteraction(memory.id); onBack() }) {
-                        Icon(Icons.Outlined.DeleteOutline, "Delete memory")
+                        Icon(Icons.Outlined.DeleteOutline, "Delete memory", tint = androidx.compose.ui.graphics.Color(0xFFFF3B30))
                     }
                 }
             )
@@ -104,8 +112,7 @@ fun MemoryDetailScreen(
                 Surface(
                     Modifier.fillMaxWidth(),
                     color = MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                    shape = RoundedCornerShape(20.dp)
+                    shape = RoundedCornerShape(14.dp)
                 ) {
                     Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         Row(

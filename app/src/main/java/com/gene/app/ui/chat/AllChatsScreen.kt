@@ -52,18 +52,18 @@ import com.gene.app.data.ChatSession
 import com.gene.app.data.GeneDatabase
 import com.gene.app.data.Person
 import com.gene.app.ui.theme.GeneGray
+import com.gene.app.ui.theme.IosBlue
 
 @Composable
 fun ChatPreviewCard(session: ChatSession, onClick: () -> Unit) {
     Card(
         modifier = Modifier.size(146.dp).clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        shape = RoundedCornerShape(18.dp)
+        shape = RoundedCornerShape(14.dp)
     ) {
         Column(Modifier.fillMaxSize().padding(15.dp), verticalArrangement = Arrangement.SpaceBetween) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(if (session.favorite) Icons.Outlined.Star else Icons.Outlined.History, "Chat", tint = GeneGray, modifier = Modifier.size(22.dp))
+                Icon(if (session.favorite) Icons.Outlined.Star else Icons.Outlined.History, "Chat", tint = IosBlue, modifier = Modifier.size(22.dp))
                 Text(session.title, style = MaterialTheme.typography.bodyLarge, maxLines = 4, overflow = TextOverflow.Ellipsis)
             }
             Text(if (session.messageCount == 0) "New chat" else "${session.messageCount} messages", color = GeneGray, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
@@ -75,12 +75,12 @@ fun ChatPreviewCard(session: ChatSession, onClick: () -> Unit) {
 fun ChatPreviewMoreCard(onClick: () -> Unit) {
     Card(
         modifier = Modifier.size(146.dp).clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
-        shape = RoundedCornerShape(18.dp)
+        colors = CardDefaults.cardColors(containerColor = IosBlue),
+        shape = RoundedCornerShape(14.dp)
     ) {
         Column(Modifier.fillMaxSize().padding(15.dp), verticalArrangement = Arrangement.SpaceBetween) {
-            Icon(Icons.Outlined.ChevronRight, "See all chats", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(24.dp))
-            Text("Load more", color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.titleMedium)
+            Icon(Icons.Outlined.ChevronRight, "See all chats", tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(24.dp))
+            Text("Load more", color = androidx.compose.ui.graphics.Color.White, style = MaterialTheme.typography.titleMedium)
         }
     }
 }
@@ -99,7 +99,7 @@ fun AllChatsScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Chats · ${person.name}", style = MaterialTheme.typography.titleMedium) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, "Back") } }
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, "Back", tint = IosBlue) } }
             )
         }
     ) { padding ->
@@ -138,8 +138,7 @@ fun SessionRow(
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(14.dp)
     ) {
         Row(
             Modifier.fillMaxWidth().padding(start = 17.dp, top = 15.dp, bottom = 15.dp),

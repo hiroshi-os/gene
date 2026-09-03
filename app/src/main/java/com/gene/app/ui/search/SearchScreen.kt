@@ -43,6 +43,10 @@ import com.gene.app.data.Person
 import com.gene.app.ui.memory.MemoryCard
 import com.gene.app.ui.theme.GeneGray
 
+import com.gene.app.ui.theme.IosBlue
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.ui.graphics.Color
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(
@@ -61,8 +65,8 @@ fun SearchScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Search ${person.name}", style = MaterialTheme.typography.titleMedium) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, "Back") } }
+                title = { Text("Search · ${person.name}", style = MaterialTheme.typography.titleMedium) },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, "Back", tint = IosBlue) } }
             )
         }
     ) { padding ->
@@ -79,13 +83,20 @@ fun SearchScreen(
                     value = query,
                     onValueChange = { query = it },
                     placeholder = { Text("Search memories and chats") },
-                    leadingIcon = { Icon(Icons.Outlined.Search, null) },
+                    leadingIcon = { Icon(Icons.Outlined.Search, null, tint = IosBlue) },
                     trailingIcon = {
                         if (query.isNotBlank()) {
                             IconButton(onClick = { query = "" }) { Icon(Icons.Outlined.Close, "Clear search") }
                         }
                     },
                     singleLine = true,
+                    shape = RoundedCornerShape(10.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                    ),
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(18.dp))
@@ -96,11 +107,10 @@ fun SearchScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth().clickable { onOpenChat(session.id) },
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                    shape = RoundedCornerShape(16.dp)
+                    shape = RoundedCornerShape(14.dp)
                 ) {
                     Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.History, "Chat", tint = GeneGray)
+                        Icon(Icons.Outlined.History, "Chat", tint = IosBlue)
                         Spacer(Modifier.width(12.dp))
                         Text(session.title, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }

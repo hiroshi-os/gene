@@ -58,6 +58,8 @@ import com.gene.app.data.TYPE_SIGNAL
 import com.gene.app.ui.common.asDate
 import com.gene.app.ui.theme.GeneGray
 
+import com.gene.app.ui.theme.IosBlue
+
 fun memoryTypeLabel(type: String): String = when (type) {
     TYPE_AUDIO -> "Voice"
     TYPE_QUOTE -> "Quote"
@@ -87,12 +89,11 @@ fun MemoryCard(
     Card(
         modifier = modifier.fillMaxWidth().clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        shape = RoundedCornerShape(18.dp)
+        shape = RoundedCornerShape(14.dp)
     ) {
         Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Icon(icon, label, tint = GeneGray, modifier = Modifier.size(22.dp))
+                Icon(icon, label, tint = IosBlue, modifier = Modifier.size(22.dp))
                 Spacer(Modifier.width(9.dp))
                 Text(label, color = GeneGray, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                 Text(memory.createdAt.asDate(), color = GeneGray, style = MaterialTheme.typography.bodyMedium)
@@ -166,7 +167,7 @@ fun AllMemoriesScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Memories · ${person.name}", style = MaterialTheme.typography.titleMedium) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, "Back") } },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, "Back", tint = IosBlue) } },
                 actions = {
                     IconButton(onClick = {
                         grid = !grid
