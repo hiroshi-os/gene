@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -34,7 +35,6 @@ import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -46,11 +46,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -62,6 +59,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalFocusManager
@@ -84,12 +82,10 @@ import com.gene.app.ui.theme.IosDarkAvatar
 import com.gene.app.ui.theme.IosDarkBg
 import com.gene.app.ui.theme.IosDarkBlue
 import com.gene.app.ui.theme.IosDarkDivider
-import com.gene.app.ui.theme.IosDarkSearch
 import com.gene.app.ui.theme.IosDarkSecondary
 import com.gene.app.ui.theme.IosLightAvatar
 import com.gene.app.ui.theme.IosLightBg
 import com.gene.app.ui.theme.IosLightDivider
-import com.gene.app.ui.theme.IosLightSearch
 import com.gene.app.ui.theme.IosLightSecondary
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -119,10 +115,15 @@ fun HomeScreen(
     val bg = if (isDark) IosDarkBg else IosLightBg
     val textPrimary = if (isDark) GeneWhite else GeneBlack
     val textSecondary = if (isDark) IosDarkSecondary else IosLightSecondary
-    val searchBg = if (isDark) IosDarkSearch else IosLightSearch
     val dividerColor = if (isDark) IosDarkDivider else IosLightDivider
     val accentBlue = if (isDark) IosDarkBlue else IosBlue
     val avatarBg = if (isDark) IosDarkAvatar else IosLightAvatar
+
+    // Frosted glass tokens for floating items
+    val frostedHeaderBg = if (isDark) Color(0xE0000000) else Color(0xEAFFFFFF)
+    val frostedSearchPillBg = if (isDark) Color(0x3D767680) else Color(0x1F767680)
+    val frostedMenuBg = if (isDark) Color(0xEA1C1C1E) else Color(0xF4F2F2F7)
+    val frostedSheetBg = if (isDark) Color(0xF01C1C1E) else Color(0xF6FFFFFF)
 
     val pinnedPeople = remember(people) { people.filter { it.favorite } }
     val filteredPeople = remember(people, searchQuery) {
@@ -132,61 +133,17 @@ fun HomeScreen(
         }
     }
 
-    Scaffold(
-        containerColor = bg,
-        topBar = {
-            TopAppBar(
-                title = {},
-                navigationIcon = {
-                    Box {
-                        TextButton(
-                            onClick = { editMenuExpanded = true },
-                            colors = ButtonDefaults.textButtonColors(contentColor = accentBlue)
-                        ) {
-                            Text("Edit", fontSize = 17.sp, fontWeight = FontWeight.Normal)
-                        }
-                        DropdownMenu(
-                            expanded = editMenuExpanded,
-                            onDismissRequest = { editMenuExpanded = false },
-                            modifier = Modifier.background(if (isDark) Color(0xFF1C1C1E) else Color(0xFFF2F2F7))
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Select Messages", color = textPrimary) },
-                                onClick = { editMenuExpanded = false }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Edit Pins", color = textPrimary) },
-                                onClick = { editMenuExpanded = false }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Settings", color = textPrimary) },
-                                onClick = { editMenuExpanded = false; onSettings() }
-                            )
-                        }
-                    }
-                },
-                actions = {
-                    // iOS Compose Icon (Pencil in box)
-                    IconButton(onClick = { showNewMessage = true }) {
-                        Icon(
-                            Icons.Outlined.Edit,
-                            contentDescription = "New Message",
-                            tint = accentBlue,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = bg)
-            )
-        }
-    ) { padding ->
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(bg)
+    ) {
+        // 1. Scrolling Content Underneath
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(bottom = 32.dp)
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(top = 108.dp, bottom = 40.dp)
         ) {
-            // 1. iOS Large Navigation Title: "Messages" (or "gene")
+            // iOS Large Title: "Messages"
             item {
                 Text(
                     text = "Messages",
@@ -194,87 +151,11 @@ fun HomeScreen(
                     fontSize = 34.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = (-0.5).sp,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
                 )
             }
 
-            // 2. iOS Search Field
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(36.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(searchBg)
-                            .padding(horizontal = 10.dp),
-                        contentAlignment = Alignment.CenterStart
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(
-                                Icons.Outlined.Search,
-                                contentDescription = "Search",
-                                tint = textSecondary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            OutlinedTextField(
-                                value = searchQuery,
-                                onValueChange = { searchQuery = it; isSearchActive = true },
-                                placeholder = {
-                                    Text("Search", color = textSecondary, fontSize = 16.sp)
-                                },
-                                singleLine = true,
-                                modifier = Modifier.weight(1f),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = Color.Transparent,
-                                    unfocusedBorderColor = Color.Transparent,
-                                    focusedContainerColor = Color.Transparent,
-                                    unfocusedContainerColor = Color.Transparent,
-                                    focusedTextColor = textPrimary,
-                                    unfocusedTextColor = textPrimary
-                                )
-                            )
-                            if (searchQuery.isNotEmpty()) {
-                                IconButton(
-                                    onClick = { searchQuery = "" },
-                                    modifier = Modifier.size(20.dp)
-                                ) {
-                                    Icon(
-                                        Icons.Outlined.Close,
-                                        contentDescription = "Clear",
-                                        tint = textSecondary,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    if (isSearchActive || searchQuery.isNotEmpty()) {
-                        TextButton(
-                            onClick = {
-                                searchQuery = ""
-                                isSearchActive = false
-                            },
-                            colors = ButtonDefaults.textButtonColors(contentColor = accentBlue),
-                            modifier = Modifier.padding(start = 4.dp)
-                        ) {
-                            Text("Cancel", fontSize = 16.sp)
-                        }
-                    }
-                }
-            }
-
-            // 3. iMessage Pinned Contacts Carousel (iOS Pinned Bubbles)
+            // iMessage Pinned Contacts Carousel (Floating Bubbles)
             if (pinnedPeople.isNotEmpty() && searchQuery.isEmpty()) {
                 item {
                     LazyRow(
@@ -299,7 +180,7 @@ fun HomeScreen(
                 }
             }
 
-            // 4. Empty State
+            // Empty State
             if (filteredPeople.isEmpty()) {
                 item {
                     Box(
@@ -331,7 +212,7 @@ fun HomeScreen(
                 }
             }
 
-            // 5. iMessage Conversation List Items
+            // Conversation Rows
             items(filteredPeople, key = { it.id }) { person ->
                 IMessageChatRow(
                     person = person,
@@ -347,17 +228,158 @@ fun HomeScreen(
                 )
             }
         }
+
+        // 2. Floating Frosted Glass Header (Top Bar + Search Bar)
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            frostedHeaderBg,
+                            frostedHeaderBg,
+                            frostedHeaderBg.copy(alpha = 0.95f),
+                            Color.Transparent
+                        )
+                    )
+                )
+                .statusBarsPadding()
+                .padding(bottom = 8.dp)
+        ) {
+            // Top Navigation Action Row: Edit on left, Compose on right
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box {
+                    TextButton(
+                        onClick = { editMenuExpanded = true },
+                        colors = ButtonDefaults.textButtonColors(contentColor = accentBlue)
+                    ) {
+                        Text("Edit", fontSize = 17.sp, fontWeight = FontWeight.Normal)
+                    }
+                    DropdownMenu(
+                        expanded = editMenuExpanded,
+                        onDismissRequest = { editMenuExpanded = false },
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(frostedMenuBg)
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Select Messages", color = textPrimary) },
+                            onClick = { editMenuExpanded = false }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Edit Pins", color = textPrimary) },
+                            onClick = { editMenuExpanded = false }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Settings", color = textPrimary) },
+                            onClick = { editMenuExpanded = false; onSettings() }
+                        )
+                    }
+                }
+
+                // iOS Compose Icon (Pencil in Box)
+                IconButton(onClick = { showNewMessage = true }) {
+                    Icon(
+                        Icons.Outlined.Edit,
+                        contentDescription = "New Message",
+                        tint = accentBlue,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+
+            // Floating Frosted Search Field
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(36.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(frostedSearchPillBg)
+                        .padding(horizontal = 10.dp),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            Icons.Outlined.Search,
+                            contentDescription = "Search",
+                            tint = textSecondary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it; isSearchActive = true },
+                            placeholder = {
+                                Text("Search", color = textSecondary, fontSize = 16.sp)
+                            },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color.Transparent,
+                                unfocusedBorderColor = Color.Transparent,
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                focusedTextColor = textPrimary,
+                                unfocusedTextColor = textPrimary
+                            )
+                        )
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(
+                                onClick = { searchQuery = "" },
+                                modifier = Modifier.size(20.dp)
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Close,
+                                    contentDescription = "Clear",
+                                    tint = textSecondary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (isSearchActive || searchQuery.isNotEmpty()) {
+                    TextButton(
+                        onClick = {
+                            searchQuery = ""
+                            isSearchActive = false
+                        },
+                        colors = ButtonDefaults.textButtonColors(contentColor = accentBlue),
+                        modifier = Modifier.padding(start = 4.dp)
+                    ) {
+                        Text("Cancel", fontSize = 16.sp)
+                    }
+                }
+            }
+        }
     }
 
-    // Modal: iOS "New Message" Sheet
+    // Modal: iOS "New Message" Sheet with Frosted Glass Styling
     if (showNewMessage) {
         NewMessageSheet(
             isDark = isDark,
-            bg = bg,
+            sheetBg = frostedSheetBg,
             textPrimary = textPrimary,
             textSecondary = textSecondary,
             accentBlue = accentBlue,
-            searchBg = searchBg,
+            searchBg = frostedSearchPillBg,
             onDismiss = { showNewMessage = false },
             onCreate = { name, note ->
                 showNewMessage = false
@@ -366,11 +388,12 @@ fun HomeScreen(
         )
     }
 
-    // Modal: iOS Haptic Touch Action Sheet
+    // Modal: iOS Haptic Touch Action Sheet with Frosted Glass Styling
     selectedPersonForAction?.let { person ->
         IMessageActionSheet(
             person = person,
             isDark = isDark,
+            sheetBg = frostedSheetBg,
             textPrimary = textPrimary,
             textSecondary = textSecondary,
             onDismiss = { selectedPersonForAction = null },
@@ -400,7 +423,7 @@ fun HomeScreen(
             textPrimary = textPrimary,
             textSecondary = textSecondary,
             accentBlue = accentBlue,
-            searchBg = searchBg,
+            searchBg = frostedSearchPillBg,
             onDismiss = { editingPerson = null },
             onSave = { newName ->
                 if (db != null && newName.isNotBlank()) {
@@ -442,7 +465,7 @@ fun HomeScreen(
 }
 
 /**
- * iMessage Pinned Contact Avatar with Floating Speech Bubble Snippet
+ * iMessage Pinned Contact Avatar with Frosted Glass Floating Speech Bubble
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -459,6 +482,9 @@ fun IMessagePinnedContact(
     val haptic = LocalHapticFeedback.current
     val previewText = latestInteraction?.body?.take(22) ?: person.note.take(22)
 
+    // Frosted glass speech bubble background
+    val frostedBubbleBg = if (isDark) Color(0xCC2C2C2E) else Color(0xD8E5E5EA)
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -471,12 +497,12 @@ fun IMessagePinnedContact(
                 }
             )
     ) {
-        // Floating Speech Bubble Preview (iMessage style)
+        // Floating Frosted Glass Speech Bubble Preview (iMessage style)
         if (previewText.isNotBlank()) {
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(12.dp))
-                    .background(if (isDark) Color(0xFF2C2C2E) else Color(0xFFE5E5EA))
+                    .background(frostedBubbleBg)
                     .padding(horizontal = 8.dp, vertical = 4.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -665,7 +691,7 @@ fun IMessageChatRow(
             }
         }
 
-        // iOS Table Inset Divider (starts after avatar at 76dp)
+        // iOS Table Inset Divider (starts after avatar at 88dp)
         HorizontalDivider(
             modifier = Modifier.padding(start = 88.dp),
             thickness = 0.5.dp,
@@ -675,13 +701,13 @@ fun IMessageChatRow(
 }
 
 /**
- * iOS New Message Compose Sheet
+ * iOS New Message Compose Sheet with Frosted Glass Container
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NewMessageSheet(
     isDark: Boolean,
-    bg: Color,
+    sheetBg: Color,
     textPrimary: Color,
     textSecondary: Color,
     accentBlue: Color,
@@ -700,7 +726,7 @@ fun NewMessageSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = if (isDark) Color(0xFF1C1C1E) else Color(0xFFFFFFFF)
+        containerColor = sheetBg
     ) {
         Column(
             modifier = Modifier
@@ -708,7 +734,7 @@ fun NewMessageSheet(
                 .navigationBarsPadding()
                 .padding(bottom = 24.dp)
         ) {
-            // iOS Top Bar: Cancel | New Message
+            // iOS Top Bar: Cancel | New Message | Done
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -805,13 +831,14 @@ fun NewMessageSheet(
 }
 
 /**
- * iOS Haptic Touch Context Menu Sheet
+ * iOS Haptic Touch Context Menu Sheet with Frosted Glass Container
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun IMessageActionSheet(
     person: Person,
     isDark: Boolean,
+    sheetBg: Color,
     textPrimary: Color,
     textSecondary: Color,
     onDismiss: () -> Unit,
@@ -821,7 +848,7 @@ fun IMessageActionSheet(
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = if (isDark) Color(0xFF1C1C1E) else Color(0xFFF2F2F7)
+        containerColor = sheetBg
     ) {
         Column(
             modifier = Modifier
