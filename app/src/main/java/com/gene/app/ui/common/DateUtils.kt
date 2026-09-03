@@ -7,10 +7,12 @@ import java.util.Locale
 fun Long.asDate(): String = SimpleDateFormat("d MMM", Locale.getDefault()).format(Date(this))
 fun Long.asFullDate(): String = SimpleDateFormat("d MMM yyyy, HH:mm", Locale.getDefault()).format(Date(this))
 
-fun Long.asWhatsAppTime(): String {
+fun Long.asWhatsAppTime(): String = asIMessageTime()
+
+fun Long.asIMessageTime(): String {
     if (this <= 0L) return ""
     val now = java.util.Calendar.getInstance()
-    val time = java.util.Calendar.getInstance().apply { timeInMillis = this@asWhatsAppTime }
+    val time = java.util.Calendar.getInstance().apply { timeInMillis = this@asIMessageTime }
 
     val isSameYear = now.get(java.util.Calendar.YEAR) == time.get(java.util.Calendar.YEAR)
     val dayDiff = now.get(java.util.Calendar.DAY_OF_YEAR) - time.get(java.util.Calendar.DAY_OF_YEAR)
@@ -29,8 +31,8 @@ fun Long.asWhatsAppTime(): String {
     }
 
     return if (isSameYear) {
-        SimpleDateFormat("d MMM", Locale.getDefault()).format(Date(this))
+        SimpleDateFormat("M/d/yy", Locale.getDefault()).format(Date(this))
     } else {
-        SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(Date(this))
+        SimpleDateFormat("M/d/yy", Locale.getDefault()).format(Date(this))
     }
 }

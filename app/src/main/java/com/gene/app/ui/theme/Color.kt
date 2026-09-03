@@ -9,7 +9,7 @@ val GeneMutedGray = Color(0xFF9B9A97)
 val GeneDarkOutline = Color(0xFF555555)
 val GeneLightOutline = Color(0xFFB4B4B0)
 
-// Notion Design Language Tokens
+// Notion & General Design Tokens
 val NotionLightBg = Color(0xFFFFFFFF)
 val NotionLightSurface = Color(0xFFFAFAFA)
 val NotionLightFrosted = Color(0xE8FFFFFF)
@@ -27,3 +27,18 @@ val NotionDarkPillActive = Color(0xFFEDEDED)
 val NotionDarkAvatar = Color(0xFF222222)
 val NotionDarkTextPrimary = Color(0xFFEDEDED)
 val NotionDarkTextSecondary = Color(0xFF9B9A97)
+
+// Apple iMessage Design Tokens
+val IosBlue = Color(0xFF007AFF)
+val IosDarkBlue = Color(0xFF0A84FF)
+val IosLightBg = Color(0xFFFFFFFF)
+val IosLightSearch = Color(0x1E767680)
+val IosLightDivider = Color(0x2E3C3C43)
+val IosLightAvatar = Color(0xFF8E8E93)
+val IosLightSecondary = Color(0xFF8E8E93)
+
+val IosDarkBg = Color(0xFF000000)
+val IosDarkSearch = Color(0x3D767680)
+val IosDarkDivider = Color(0x52545458)
+val IosDarkAvatar = Color(0xFF636366)
+val IosDarkSecondary = Color(0xFF8E8E93)
