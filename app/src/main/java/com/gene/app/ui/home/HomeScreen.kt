@@ -7,6 +7,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,30 +23,21 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.DoneAll
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.outlined.Call
-import androidx.compose.material.icons.outlined.CameraAlt
-import androidx.compose.material.icons.outlined.Chat
-import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.DonutLarge
-import androidx.compose.material.icons.outlined.Groups
-import androidx.compose.material.icons.outlined.Mic
-import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.GraphicEq
+import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -78,7 +70,22 @@ import com.gene.app.data.Interaction
 import com.gene.app.data.Person
 import com.gene.app.data.TYPE_AUDIO
 import com.gene.app.ui.common.asWhatsAppTime
-import com.gene.app.ui.theme.WhatsAppColors
+import com.gene.app.ui.theme.GeneGray
+import com.gene.app.ui.theme.GeneMutedGray
+import com.gene.app.ui.theme.NotionDarkAvatar
+import com.gene.app.ui.theme.NotionDarkBg
+import com.gene.app.ui.theme.NotionDarkFrosted
+import com.gene.app.ui.theme.NotionDarkPill
+import com.gene.app.ui.theme.NotionDarkPillActive
+import com.gene.app.ui.theme.NotionDarkTextPrimary
+import com.gene.app.ui.theme.NotionDarkTextSecondary
+import com.gene.app.ui.theme.NotionLightAvatar
+import com.gene.app.ui.theme.NotionLightBg
+import com.gene.app.ui.theme.NotionLightFrosted
+import com.gene.app.ui.theme.NotionLightPill
+import com.gene.app.ui.theme.NotionLightPillActive
+import com.gene.app.ui.theme.NotionLightTextPrimary
+import com.gene.app.ui.theme.NotionLightTextSecondary
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,14 +98,18 @@ fun HomeScreen(
     db: GeneDatabase? = null
 ) {
     var showAdd by remember { mutableStateOf(false) }
-    var menuExpanded by remember { mutableStateOf(false) }
     var isSearching by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf("All") }
     var currentNavTab by remember { mutableStateOf(0) }
 
-    val dark = isSystemInDarkTheme() || MaterialTheme.colorScheme.background == WhatsAppColors.DarkBackground
+    val dark = isSystemInDarkTheme() || MaterialTheme.colorScheme.background == NotionDarkBg
     val latestInteractions = remember(people) { db?.latestInteractions().orEmpty() }
+
+    val textPrimary = if (dark) NotionDarkTextPrimary else NotionLightTextPrimary
+    val textSecondary = if (dark) NotionDarkTextSecondary else NotionLightTextSecondary
+    val frostedBg = if (dark) NotionDarkFrosted else NotionLightFrosted
+    val appBg = if (dark) NotionDarkBg else NotionLightBg
 
     val filteredPeople = remember(people, searchQuery, selectedFilter) {
         var list = people
@@ -106,348 +117,268 @@ fun HomeScreen(
             list = list.filter { it.interactionCount > 0 }
         } else if (selectedFilter == "Favorites") {
             list = list.filter { it.favorite }
-        } else if (selectedFilter == "Groups") {
-            list = emptyList() // Future groups support
         }
         if (searchQuery.isNotBlank()) {
-            list = list.filter { it.name.contains(searchQuery, ignoreCase = true) || it.note.contains(searchQuery, ignoreCase = true) }
+            list = list.filter {
+                it.name.contains(searchQuery, ignoreCase = true) || it.note.contains(searchQuery, ignoreCase = true)
+            }
         }
         list
     }
 
     Scaffold(
+        containerColor = appBg,
         topBar = {
             if (isSearching) {
-                TopAppBar(
-                    title = {
+                Surface(
+                    color = frostedBg,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         OutlinedTextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
-                            placeholder = { Text("Search…", color = if (dark) WhatsAppColors.DarkTextSecondary else WhatsAppColors.LightTextSecondary) },
+                            placeholder = { Text("Search memories, chats, people…", color = textSecondary, fontSize = 15.sp) },
                             singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
+                            leadingIcon = {
+                                Icon(Icons.Outlined.Search, contentDescription = null, tint = textSecondary, modifier = Modifier.size(20.dp))
+                            },
+                            trailingIcon = {
+                                IconButton(onClick = { isSearching = false; searchQuery = "" }) {
+                                    Icon(Icons.Outlined.Close, "Close search", tint = textSecondary)
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(16.dp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = Color.Transparent,
                                 unfocusedBorderColor = Color.Transparent,
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent
+                                focusedContainerColor = if (dark) NotionDarkPill else NotionLightPill,
+                                unfocusedContainerColor = if (dark) NotionDarkPill else NotionLightPill,
+                                focusedTextColor = textPrimary,
+                                unfocusedTextColor = textPrimary
                             )
                         )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = { isSearching = false; searchQuery = "" }) {
-                            Icon(Icons.Outlined.Close, "Close search")
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = if (dark) WhatsAppColors.DarkTopBar else WhatsAppColors.LightTopBar
-                    )
-                )
+                    }
+                }
             } else {
                 TopAppBar(
                     title = {
                         Text(
-                            text = when (currentNavTab) {
-                                0 -> "WhatsApp"
-                                1 -> "Updates"
-                                2 -> "Communities"
-                                3 -> "Calls"
-                                else -> "WhatsApp"
-                            },
-                            color = if (dark) WhatsAppColors.DarkTextPrimary else {
-                                if (currentNavTab == 0) WhatsAppColors.GreenPrimary else WhatsAppColors.LightTextPrimary
-                            },
+                            text = "gene",
+                            color = textPrimary,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 22.sp
+                            fontSize = 24.sp,
+                            letterSpacing = (-0.5).sp
                         )
                     },
                     actions = {
-                        if (currentNavTab != 2) {
-                            IconButton(onClick = { /* Camera action */ }) {
-                                Icon(Icons.Outlined.CameraAlt, "Camera", tint = if (dark) WhatsAppColors.DarkTextPrimary else WhatsAppColors.LightTextPrimary)
-                            }
-                        }
                         IconButton(onClick = { isSearching = true }) {
-                            Icon(Icons.Outlined.Search, "Search", tint = if (dark) WhatsAppColors.DarkTextPrimary else WhatsAppColors.LightTextPrimary)
+                            Icon(Icons.Outlined.Search, "Search", tint = textPrimary)
                         }
-                        Box {
-                            IconButton(onClick = { menuExpanded = true }) {
-                                Icon(Icons.Outlined.MoreVert, "More options", tint = if (dark) WhatsAppColors.DarkTextPrimary else WhatsAppColors.LightTextPrimary)
-                            }
-                            DropdownMenu(
-                                expanded = menuExpanded,
-                                onDismissRequest = { menuExpanded = false },
-                                modifier = Modifier.background(if (dark) WhatsAppColors.DarkSurface else WhatsAppColors.LightSurface)
-                            ) {
-                                when (currentNavTab) {
-                                    0 -> {
-                                        DropdownMenuItem(
-                                            text = { Text("New person", color = if (dark) WhatsAppColors.DarkTextPrimary else WhatsAppColors.LightTextPrimary) },
-                                            onClick = { menuExpanded = false; showAdd = true }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("New group", color = if (dark) WhatsAppColors.DarkTextPrimary else WhatsAppColors.LightTextPrimary) },
-                                            onClick = { menuExpanded = false; showAdd = true }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Starred messages", color = if (dark) WhatsAppColors.DarkTextPrimary else WhatsAppColors.LightTextPrimary) },
-                                            onClick = { menuExpanded = false }
-                                        )
-                                    }
-                                    1 -> {
-                                        DropdownMenuItem(
-                                            text = { Text("Status privacy", color = if (dark) WhatsAppColors.DarkTextPrimary else WhatsAppColors.LightTextPrimary) },
-                                            onClick = { menuExpanded = false }
-                                        )
-                                    }
-                                    3 -> {
-                                        DropdownMenuItem(
-                                            text = { Text("Clear call log", color = if (dark) WhatsAppColors.DarkTextPrimary else WhatsAppColors.LightTextPrimary) },
-                                            onClick = { menuExpanded = false }
-                                        )
-                                    }
-                                }
-                                DropdownMenuItem(
-                                    text = { Text("Settings", color = if (dark) WhatsAppColors.DarkTextPrimary else WhatsAppColors.LightTextPrimary) },
-                                    onClick = { menuExpanded = false; onSettings() }
-                                )
-                            }
+                        IconButton(onClick = onSettings) {
+                            Icon(Icons.Outlined.Settings, "Settings", tint = textPrimary)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = if (dark) WhatsAppColors.DarkTopBar else WhatsAppColors.LightTopBar
+                        containerColor = appBg
                     )
                 )
             }
         },
         floatingActionButton = {
-            when (currentNavTab) {
-                0 -> {
-                    FloatingActionButton(
-                        onClick = { showAdd = true },
-                        shape = RoundedCornerShape(16.dp),
-                        containerColor = WhatsAppColors.GreenTeal,
-                        contentColor = Color.White
-                    ) {
-                        Icon(Icons.Filled.Chat, "New chat", modifier = Modifier.size(24.dp))
-                    }
-                }
-                1 -> {
-                    FloatingActionButton(
-                        onClick = { /* Status update */ },
-                        shape = RoundedCornerShape(16.dp),
-                        containerColor = WhatsAppColors.GreenTeal,
-                        contentColor = Color.White
-                    ) {
-                        Icon(Icons.Outlined.CameraAlt, "Camera status", modifier = Modifier.size(24.dp))
-                    }
-                }
-                3 -> {
-                    FloatingActionButton(
-                        onClick = { /* New call */ },
-                        shape = RoundedCornerShape(16.dp),
-                        containerColor = WhatsAppColors.GreenTeal,
-                        contentColor = Color.White
-                    ) {
-                        Icon(Icons.Outlined.Call, "New call", modifier = Modifier.size(24.dp))
-                    }
-                }
+            FloatingActionButton(
+                onClick = { showAdd = true },
+                shape = RoundedCornerShape(18.dp),
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ) {
+                Icon(Icons.Outlined.Add, "New person", modifier = Modifier.size(24.dp))
             }
         },
         bottomBar = {
-            NavigationBar(
-                containerColor = if (dark) WhatsAppColors.DarkSurface else WhatsAppColors.LightSurface,
-                tonalElevation = 4.dp
+            Surface(
+                color = frostedBg,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                NavigationBarItem(
-                    selected = currentNavTab == 0,
-                    onClick = { currentNavTab = 0 },
-                    icon = {
-                        Box {
-                            Icon(Icons.Filled.ChatBubble, "Chats")
-                            if (people.isNotEmpty()) {
-                                Badge(
-                                    containerColor = WhatsAppColors.GreenAccent,
-                                    contentColor = Color.Black,
-                                    modifier = Modifier.align(Alignment.TopEnd)
-                                ) {
-                                    Text(people.size.toString(), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    },
-                    label = { Text("Chats", fontWeight = if (currentNavTab == 0) FontWeight.Bold else FontWeight.Normal) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = if (dark) WhatsAppColors.DarkTextPrimary else WhatsAppColors.GreenPrimary,
-                        selectedTextColor = if (dark) WhatsAppColors.DarkTextPrimary else WhatsAppColors.GreenPrimary,
-                        indicatorColor = if (dark) WhatsAppColors.DarkChipSelectedBg else WhatsAppColors.LightChipSelectedBg,
-                        unselectedIconColor = if (dark) WhatsAppColors.DarkTextSecondary else WhatsAppColors.LightTextSecondary,
-                        unselectedTextColor = if (dark) WhatsAppColors.DarkTextSecondary else WhatsAppColors.LightTextSecondary
-                    )
-                )
-                NavigationBarItem(
-                    selected = currentNavTab == 1,
-                    onClick = { currentNavTab = 1 },
-                    icon = { Icon(Icons.Outlined.DonutLarge, "Updates") },
-                    label = { Text("Updates", fontWeight = if (currentNavTab == 1) FontWeight.Bold else FontWeight.Normal) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = if (dark) WhatsAppColors.DarkTextPrimary else WhatsAppColors.GreenPrimary,
-                        selectedTextColor = if (dark) WhatsAppColors.DarkTextPrimary else WhatsAppColors.GreenPrimary,
-                        indicatorColor = if (dark) WhatsAppColors.DarkChipSelectedBg else WhatsAppColors.LightChipSelectedBg,
-                        unselectedIconColor = if (dark) WhatsAppColors.DarkTextSecondary else WhatsAppColors.LightTextSecondary,
-                        unselectedTextColor = if (dark) WhatsAppColors.DarkTextSecondary else WhatsAppColors.LightTextSecondary
-                    )
-                )
-                NavigationBarItem(
-                    selected = currentNavTab == 2,
-                    onClick = { currentNavTab = 2 },
-                    icon = { Icon(Icons.Outlined.Groups, "Communities") },
-                    label = { Text("Communities", fontWeight = if (currentNavTab == 2) FontWeight.Bold else FontWeight.Normal) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = if (dark) WhatsAppColors.DarkTextPrimary else WhatsAppColors.GreenPrimary,
-                        selectedTextColor = if (dark) WhatsAppColors.DarkTextPrimary else WhatsAppColors.GreenPrimary,
-                        indicatorColor = if (dark) WhatsAppColors.DarkChipSelectedBg else WhatsAppColors.LightChipSelectedBg,
-                        unselectedIconColor = if (dark) WhatsAppColors.DarkTextSecondary else WhatsAppColors.LightTextSecondary,
-                        unselectedTextColor = if (dark) WhatsAppColors.DarkTextSecondary else WhatsAppColors.LightTextSecondary
-                    )
-                )
-                NavigationBarItem(
-                    selected = currentNavTab == 3,
-                    onClick = { currentNavTab = 3 },
-                    icon = { Icon(Icons.Outlined.Call, "Calls") },
-                    label = { Text("Calls", fontWeight = if (currentNavTab == 3) FontWeight.Bold else FontWeight.Normal) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = if (dark) WhatsAppColors.DarkTextPrimary else WhatsAppColors.GreenPrimary,
-                        selectedTextColor = if (dark) WhatsAppColors.DarkTextPrimary else WhatsAppColors.GreenPrimary,
-                        indicatorColor = if (dark) WhatsAppColors.DarkChipSelectedBg else WhatsAppColors.LightChipSelectedBg,
-                        unselectedIconColor = if (dark) WhatsAppColors.DarkTextSecondary else WhatsAppColors.LightTextSecondary,
-                        unselectedTextColor = if (dark) WhatsAppColors.DarkTextSecondary else WhatsAppColors.LightTextSecondary
-                    )
-                )
-            }
-        }
-    ) { padding ->
-        when (currentNavTab) {
-            0 -> {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .background(if (dark) WhatsAppColors.DarkBackground else WhatsAppColors.LightBackground)
+                NavigationBar(
+                    containerColor = Color.Transparent,
+                    tonalElevation = 0.dp
                 ) {
-                    // Search Pill Bar (Meta AI / Search)
-                    if (!isSearching) {
-                        item {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 6.dp)
-                                    .clip(CircleShape)
-                                    .background(if (dark) WhatsAppColors.DarkSearchBg else WhatsAppColors.LightSearchBg)
-                                    .clickable { isSearching = true }
-                                    .padding(horizontal = 16.dp, vertical = 10.dp)
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        Icons.Outlined.Search,
-                                        contentDescription = null,
-                                        tint = if (dark) WhatsAppColors.DarkTextSecondary else WhatsAppColors.LightTextSecondary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(Modifier.width(12.dp))
-                                    Text(
-                                        "Ask Meta AI or Search",
-                                        color = if (dark) WhatsAppColors.DarkTextSecondary else WhatsAppColors.LightTextSecondary,
-                                        fontSize = 15.sp
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // Filter Chips (All, Unread, Favorites, Groups)
-                    item {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState())
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            val filters = listOf("All", "Unread", "Favorites", "Groups")
-                            filters.forEach { filter ->
-                                val selected = selectedFilter == filter
-                                Surface(
-                                    shape = CircleShape,
-                                    color = if (selected) {
-                                        if (dark) WhatsAppColors.DarkChipSelectedBg else WhatsAppColors.LightChipSelectedBg
-                                    } else {
-                                        if (dark) WhatsAppColors.DarkChipBg else WhatsAppColors.LightChipBg
-                                    },
-                                    modifier = Modifier.clickable { selectedFilter = filter }
-                                ) {
-                                    Text(
-                                        text = filter,
-                                        color = if (selected) {
-                                            if (dark) WhatsAppColors.DarkChipSelectedText else WhatsAppColors.LightChipSelectedText
-                                        } else {
-                                            if (dark) WhatsAppColors.DarkTextSecondary else WhatsAppColors.LightTextSecondary
-                                        },
-                                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                                        fontSize = 13.sp,
-                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    if (filteredPeople.isEmpty()) {
-                        item {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(40.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    Text(
-                                        if (searchQuery.isNotBlank()) "No chats match \"$searchQuery\"" else "No chats yet",
-                                        color = if (dark) WhatsAppColors.DarkTextSecondary else WhatsAppColors.LightTextSecondary,
-                                        fontSize = 16.sp
-                                    )
-                                    Button(
-                                        onClick = { showAdd = true },
-                                        colors = ButtonDefaults.buttonColors(containerColor = WhatsAppColors.GreenTeal)
+                    NavigationBarItem(
+                        selected = currentNavTab == 0,
+                        onClick = { currentNavTab = 0 },
+                        icon = {
+                            Box {
+                                Icon(if (currentNavTab == 0) Icons.Filled.ChatBubble else Icons.Outlined.ChatBubbleOutline, "Chats")
+                                if (people.isNotEmpty()) {
+                                    Badge(
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                                        modifier = Modifier.align(Alignment.TopEnd)
                                     ) {
-                                        Text("Start a chat")
+                                        Text(people.size.toString(), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
+                        },
+                        label = { Text("Chats", fontWeight = if (currentNavTab == 0) FontWeight.Bold else FontWeight.Normal, fontSize = 12.sp) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = textPrimary,
+                            selectedTextColor = textPrimary,
+                            indicatorColor = if (dark) NotionDarkPill else NotionLightPill,
+                            unselectedIconColor = textSecondary,
+                            unselectedTextColor = textSecondary
+                        )
+                    )
+                    NavigationBarItem(
+                        selected = currentNavTab == 1,
+                        onClick = { currentNavTab = 1 },
+                        icon = { Icon(Icons.Outlined.Lightbulb, "Memories") },
+                        label = { Text("Memories", fontWeight = if (currentNavTab == 1) FontWeight.Bold else FontWeight.Normal, fontSize = 12.sp) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = textPrimary,
+                            selectedTextColor = textPrimary,
+                            indicatorColor = if (dark) NotionDarkPill else NotionLightPill,
+                            unselectedIconColor = textSecondary,
+                            unselectedTextColor = textSecondary
+                        )
+                    )
+                }
+            }
+        }
+    ) { padding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(top = 110.dp, bottom = 90.dp)
+            ) {
+                if (filteredPeople.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 60.dp, start = 32.dp, end = 32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(14.dp)
+                            ) {
+                                Text(
+                                    if (searchQuery.isNotBlank()) "No one matches \"$searchQuery\"" else "No people or chats yet",
+                                    color = textSecondary,
+                                    fontSize = 16.sp
+                                )
+                                Button(
+                                    onClick = { showAdd = true },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        contentColor = MaterialTheme.colorScheme.onPrimary
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Text("Add someone")
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Chat rows (WhatsApp structure, Notion aesthetics: zero borders)
+                items(filteredPeople, key = { it.id }) { person ->
+                    NotionChatRow(
+                        person = person,
+                        latestInteraction = latestInteractions[person.id],
+                        dark = dark,
+                        onClick = { onPerson(person.id) }
+                    )
+                }
+            }
+
+            // Floating Frosted Glass Search Bar & Filter Tags
+            if (!isSearching) {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .background(frostedBg)
+                        .padding(bottom = 8.dp)
+                ) {
+                    // Frosted Glass Search Pill
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(if (dark) NotionDarkPill else NotionLightPill)
+                            .clickable { isSearching = true }
+                            .padding(horizontal = 16.dp, vertical = 11.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Outlined.Search,
+                                contentDescription = null,
+                                tint = textSecondary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                "Search memories, chats, people…",
+                                color = textSecondary,
+                                fontSize = 14.sp
+                            )
                         }
                     }
 
-                    // WhatsApp Chat Items
-                    items(filteredPeople, key = { it.id }) { person ->
-                        WhatsAppChatRow(
-                            person = person,
-                            latestInteraction = latestInteractions[person.id],
-                            dark = dark,
-                            onClick = { onPerson(person.id) }
-                        )
-                    }
-
-                    item {
-                        Spacer(Modifier.height(80.dp))
+                    // Notion Filter Tags (Seamless, zero borders)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val filters = listOf("All", "Unread", "Favorites")
+                        filters.forEach { filter ->
+                            val selected = selectedFilter == filter
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(
+                                        if (selected) {
+                                            if (dark) NotionDarkPillActive else NotionLightPillActive
+                                        } else {
+                                            if (dark) NotionDarkPill else NotionLightPill
+                                        }
+                                    )
+                                    .clickable { selectedFilter = filter }
+                                    .padding(horizontal = 14.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    text = filter,
+                                    color = if (selected) {
+                                        if (dark) NotionDarkBg else NotionLightBg
+                                    } else {
+                                        textSecondary
+                                    },
+                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
                     }
                 }
             }
-            1 -> WhatsAppUpdatesView(dark, padding)
-            2 -> WhatsAppCommunitiesView(dark, padding)
-            3 -> WhatsAppCallsView(dark, padding)
         }
     }
 
@@ -463,159 +394,144 @@ fun HomeScreen(
 }
 
 @Composable
-fun WhatsAppChatRow(
+fun NotionChatRow(
     person: Person,
     latestInteraction: Interaction?,
     dark: Boolean,
     onClick: () -> Unit
 ) {
-    val textColor = if (dark) WhatsAppColors.DarkTextPrimary else WhatsAppColors.LightTextPrimary
-    val secondaryColor = if (dark) WhatsAppColors.DarkTextSecondary else WhatsAppColors.LightTextSecondary
-    val dividerColor = if (dark) WhatsAppColors.DarkDivider else WhatsAppColors.LightDivider
-    val avatarBg = if (dark) WhatsAppColors.DarkAvatarBg else WhatsAppColors.LightAvatarBg
-    val avatarIcon = if (dark) WhatsAppColors.DarkAvatarIcon else WhatsAppColors.LightAvatarIcon
+    val textPrimary = if (dark) NotionDarkTextPrimary else NotionLightTextPrimary
+    val textSecondary = if (dark) NotionDarkTextSecondary else NotionLightTextSecondary
+    val avatarBg = if (dark) NotionDarkAvatar else NotionLightAvatar
 
     val displayTime = latestInteraction?.createdAt?.asWhatsAppTime() ?: person.lastSeen.asWhatsAppTime()
     val previewText = when {
         latestInteraction != null -> {
-            if (latestInteraction.type == TYPE_AUDIO) "Audio recording"
-            else latestInteraction.body.take(60)
+            if (latestInteraction.type == TYPE_AUDIO) "Voice recording"
+            else latestInteraction.body.take(65)
         }
-        person.note.isNotBlank() -> person.note.take(60)
-        else -> "Tap to start chatting"
+        person.note.isNotBlank() -> person.note.take(65)
+        else -> "No memories recorded yet"
     }
 
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
+        // Notion Minimalist Avatar (Zero border)
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .size(46.dp)
+                .clip(CircleShape)
+                .background(avatarBg),
+            contentAlignment = Alignment.Center
         ) {
-            // WhatsApp Contact Avatar
-            Box(
-                modifier = Modifier
-                    .size(50.dp)
-                    .clip(CircleShape)
-                    .background(avatarBg),
-                contentAlignment = Alignment.Center
+            Text(
+                text = person.name.take(1).uppercase(),
+                color = textPrimary,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+
+        Spacer(Modifier.width(14.dp))
+
+        // Content details + message snippet
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = person.name.take(1).uppercase(),
-                    color = avatarIcon,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.SemiBold
+                    text = person.name,
+                    color = textPrimary,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 16.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = displayTime,
+                    color = textSecondary,
+                    fontSize = 12.sp
                 )
             }
 
-            Spacer(Modifier.width(14.dp))
-
-            // Contact details + Last message
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(3.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    if (latestInteraction != null) {
+                        if (latestInteraction.type == TYPE_AUDIO) {
+                            Icon(
+                                Icons.Outlined.GraphicEq,
+                                contentDescription = null,
+                                tint = textSecondary,
+                                modifier = Modifier.size(15.dp).padding(end = 4.dp)
+                            )
+                        } else {
+                            Icon(
+                                Icons.Filled.DoneAll,
+                                contentDescription = null,
+                                tint = textSecondary,
+                                modifier = Modifier.size(15.dp).padding(end = 4.dp)
+                            )
+                        }
+                    }
                     Text(
-                        text = person.name,
-                        color = textColor,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 17.sp,
+                        text = previewText,
+                        color = textSecondary,
+                        fontSize = 14.sp,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = displayTime,
-                        color = if (person.interactionCount > 0) WhatsAppColors.GreenAccent else secondaryColor,
-                        fontSize = 12.sp,
-                        fontWeight = if (person.interactionCount > 0) FontWeight.SemiBold else FontWeight.Normal
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (latestInteraction != null) {
-                            if (latestInteraction.type == TYPE_AUDIO) {
-                                Icon(
-                                    Icons.Outlined.Mic,
-                                    contentDescription = null,
-                                    tint = secondaryColor,
-                                    modifier = Modifier.size(16.dp).padding(end = 3.dp)
-                                )
-                            } else {
-                                Icon(
-                                    Icons.Filled.DoneAll,
-                                    contentDescription = null,
-                                    tint = WhatsAppColors.BlueCheck,
-                                    modifier = Modifier.size(16.dp).padding(end = 3.dp)
-                                )
-                            }
-                        }
-                        Text(
-                            text = previewText,
-                            color = secondaryColor,
-                            fontSize = 14.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                    if (person.favorite) {
+                        Icon(
+                            Icons.Filled.PushPin,
+                            contentDescription = "Pinned",
+                            tint = textSecondary,
+                            modifier = Modifier.size(14.dp)
                         )
                     }
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        if (person.favorite) {
-                            Icon(
-                                Icons.Filled.PushPin,
-                                contentDescription = "Pinned",
-                                tint = secondaryColor,
-                                modifier = Modifier.size(16.dp)
+                    if (person.interactionCount > 0) {
+                        Box(
+                            modifier = Modifier
+                                .size(19.dp)
+                                .clip(CircleShape)
+                                .background(if (dark) NotionDarkPillActive else NotionLightPillActive),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = person.interactionCount.toString(),
+                                color = if (dark) NotionDarkBg else NotionLightBg,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
                             )
-                        }
-                        if (person.interactionCount > 0) {
-                            Box(
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .clip(CircleShape)
-                                    .background(WhatsAppColors.GreenAccent),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = person.interactionCount.toString(),
-                                    color = Color.Black,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
                         }
                     }
                 }
             }
         }
-
-        // WhatsApp Indented Divider
-        HorizontalDivider(
-            modifier = Modifier.padding(start = 78.dp),
-            thickness = 0.6.dp,
-            color = dividerColor
-        )
     }
 }
 
@@ -624,236 +540,63 @@ fun WhatsAppChatRow(
 fun AddPersonSheet(onDismiss: () -> Unit, onCreate: (String, String) -> Unit) {
     var name by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.background) {
+    val dark = isSystemInDarkTheme() || MaterialTheme.colorScheme.background == NotionDarkBg
+    val textPrimary = if (dark) NotionDarkTextPrimary else NotionLightTextPrimary
+    val textSecondary = if (dark) NotionDarkTextSecondary else NotionLightTextSecondary
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = if (dark) NotionDarkBg else NotionLightBg
+    ) {
         Column(
             Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
                 .padding(horizontal = 22.dp)
-                .padding(bottom = 24.dp),
+                .padding(bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("New contact", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Text("Add a contact or person to start capturing conversations and memories.", color = WhatsAppColors.LightTextSecondary, style = MaterialTheme.typography.bodyLarge)
+            Text("New person", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = textPrimary)
+            Text("Begin a private thread of context. You can capture memories and chats over time.", color = textSecondary, style = MaterialTheme.typography.bodyLarge)
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
-                label = { Text("Contact name") },
+                label = { Text("Name") },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = textSecondary,
+                    unfocusedBorderColor = if (dark) NotionDarkPill else NotionLightPill,
+                    focusedTextColor = textPrimary,
+                    unfocusedTextColor = textPrimary
+                )
             )
             OutlinedTextField(
                 value = note,
                 onValueChange = { note = it },
-                label = { Text("Status / note (optional)") },
+                label = { Text("Note / context (optional)") },
                 minLines = 3,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = textSecondary,
+                    unfocusedBorderColor = if (dark) NotionDarkPill else NotionLightPill,
+                    focusedTextColor = textPrimary,
+                    unfocusedTextColor = textPrimary
+                )
             )
             Button(
                 onClick = { if (name.isNotBlank()) onCreate(name, note) },
                 enabled = name.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(containerColor = WhatsAppColors.GreenTeal),
-                modifier = Modifier.fillMaxWidth()
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth().height(48.dp)
             ) {
-                Text("Create contact")
-            }
-        }
-    }
-}
-
-@Composable
-fun WhatsAppUpdatesView(dark: Boolean, padding: androidx.compose.foundation.layout.PaddingValues) {
-    val textColor = if (dark) WhatsAppColors.DarkTextPrimary else WhatsAppColors.LightTextPrimary
-    val secondaryColor = if (dark) WhatsAppColors.DarkTextSecondary else WhatsAppColors.LightTextSecondary
-    val dividerColor = if (dark) WhatsAppColors.DarkDivider else WhatsAppColors.LightDivider
-
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(padding)
-            .background(if (dark) WhatsAppColors.DarkBackground else WhatsAppColors.LightBackground)
-    ) {
-        item {
-            Text(
-                "Status",
-                color = textColor,
-                fontWeight = FontWeight.Bold,
-                fontSize = 20.sp,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)
-            )
-        }
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box {
-                    Box(
-                        modifier = Modifier
-                            .size(52.dp)
-                            .clip(CircleShape)
-                            .background(if (dark) WhatsAppColors.DarkAvatarBg else WhatsAppColors.LightAvatarBg),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Filled.Person,
-                            contentDescription = null,
-                            tint = if (dark) WhatsAppColors.DarkAvatarIcon else WhatsAppColors.LightAvatarIcon,
-                            modifier = Modifier.size(32.dp)
-                        )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .size(20.dp)
-                            .clip(CircleShape)
-                            .background(WhatsAppColors.GreenAccent)
-                            .align(Alignment.BottomEnd),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("+", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-                Spacer(Modifier.width(14.dp))
-                Column {
-                    Text("My status", color = textColor, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-                    Text("Tap to add status update", color = secondaryColor, fontSize = 14.sp)
-                }
-            }
-        }
-        item {
-            HorizontalDivider(
-                modifier = Modifier.padding(vertical = 12.dp),
-                thickness = 0.6.dp,
-                color = dividerColor
-            )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Channels", color = textColor, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                Text("Explore >", color = WhatsAppColors.GreenPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-            }
-            Text(
-                "Stay updated on topics that matter to you. Find channels to follow below.",
-                color = secondaryColor,
-                fontSize = 14.sp,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-            )
-        }
-    }
-}
-
-@Composable
-fun WhatsAppCommunitiesView(dark: Boolean, padding: androidx.compose.foundation.layout.PaddingValues) {
-    val textColor = if (dark) WhatsAppColors.DarkTextPrimary else WhatsAppColors.LightTextPrimary
-    val secondaryColor = if (dark) WhatsAppColors.DarkTextSecondary else WhatsAppColors.LightTextSecondary
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(padding)
-            .background(if (dark) WhatsAppColors.DarkBackground else WhatsAppColors.LightBackground)
-            .padding(28.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Box(
-            modifier = Modifier
-                .size(100.dp)
-                .clip(RoundedCornerShape(24.dp))
-                .background(if (dark) WhatsAppColors.DarkAvatarBg else WhatsAppColors.LightAvatarBg),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Outlined.Groups,
-                contentDescription = null,
-                tint = WhatsAppColors.GreenTeal,
-                modifier = Modifier.size(56.dp)
-            )
-        }
-        Spacer(Modifier.height(20.dp))
-        Text(
-            "Stay connected with a community",
-            color = textColor,
-            fontWeight = FontWeight.Bold,
-            fontSize = 20.sp,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-        )
-        Spacer(Modifier.height(10.dp))
-        Text(
-            "Communities bring members together in topic-based groups, and make it easy to get admin announcements.",
-            color = secondaryColor,
-            fontSize = 14.sp,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-        )
-        Spacer(Modifier.height(24.dp))
-        Button(
-            onClick = { /* Start community */ },
-            colors = ButtonDefaults.buttonColors(containerColor = WhatsAppColors.GreenTeal),
-            shape = CircleShape
-        ) {
-            Text("Start your community", modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
-        }
-    }
-}
-
-@Composable
-fun WhatsAppCallsView(dark: Boolean, padding: androidx.compose.foundation.layout.PaddingValues) {
-    val textColor = if (dark) WhatsAppColors.DarkTextPrimary else WhatsAppColors.LightTextPrimary
-    val secondaryColor = if (dark) WhatsAppColors.DarkTextSecondary else WhatsAppColors.LightTextSecondary
-
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(padding)
-            .background(if (dark) WhatsAppColors.DarkBackground else WhatsAppColors.LightBackground)
-    ) {
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(50.dp)
-                        .clip(CircleShape)
-                        .background(WhatsAppColors.GreenTeal),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Outlined.Call, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
-                }
-                Spacer(Modifier.width(16.dp))
-                Column {
-                    Text("Create call link", color = textColor, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-                    Text("Share a link for your WhatsApp call", color = secondaryColor, fontSize = 14.sp)
-                }
-            }
-            Text(
-                "Recent",
-                color = textColor,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    "To start calling contacts who have WhatsApp, tap the call icon at the bottom of your screen.",
-                    color = secondaryColor,
-                    fontSize = 14.sp,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                )
+                Text("Start thread")
             }
         }
     }
