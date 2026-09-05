@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -33,15 +34,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gene.app.data.GeneDatabase
+import com.gene.app.data.Interaction
 import com.gene.app.data.LocalRelevanceSearch
 import com.gene.app.data.Person
+import com.gene.app.data.SessionWithPerson
 import com.gene.app.ui.common.GeneBarAction
 import com.gene.app.ui.common.GeneEmptyHint
 import com.gene.app.ui.common.GeneGlassIconButton
@@ -57,23 +59,52 @@ import com.gene.app.ui.theme.rememberGeneColors
 
 private val IconTileShape = RoundedCornerShape(GeneRadius.xs)
 
+private data class MemoryHit(val memory: Interaction, val person: Person)
+
 @Composable
-fun SearchScreen(
-    person: Person,
+fun GlobalSearchScreen(
     db: GeneDatabase,
     onBack: () -> Unit,
-    onOpenChat: (Long) -> Unit,
-    onOpenMemory: (Long) -> Unit
+    onOpenPerson: (Long) -> Unit,
+    onOpenChat: (personId: Long, sessionId: Long) -> Unit,
+    onOpenMemory: (personId: Long, memoryId: Long) -> Unit
 ) {
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val colors = rememberGeneColors(dark)
     val hazeState = rememberGeneHazeState()
     var query by remember { mutableStateOf("") }
-    val memories = remember(person.id) { db.interactions(person.id) }
-    val sessions = db.sessions(person.id)
-    val memoryHits = if (query.isBlank()) memories.take(20) else LocalRelevanceSearch.relevant(memories, query, 20)
-    val sessionHits = if (query.isBlank()) sessions else sessions.filter { session ->
-        session.title.contains(query, true) || db.messages(session.id).any { it.body.contains(query, true) }
+
+    val people = remember { db.people(includeSelf = true) }
+    val sessions = remember { db.allSessions() }
+    val allMemories = remember(people) {
+        people.flatMap { person ->
+            db.interactions(person.id).map { MemoryHit(it, person) }
+        }
+    }
+
+    val personHits = remember(people, query) {
+        if (query.isBlank()) people.take(12)
+        else people.filter {
+            it.name.contains(query, true) || it.note.contains(query, true)
+        }
+    }
+    val sessionHits = remember(sessions, query) {
+        if (query.isBlank()) sessions.take(12)
+        else sessions.filter {
+            it.session.title.contains(query, true) ||
+                it.personName.contains(query, true)
+        }
+    }
+    val memoryHits = remember(allMemories, query) {
+        if (query.isBlank()) allMemories.take(16)
+        else {
+            val byPerson = allMemories.groupBy { it.person.id }
+            byPerson.values.flatMap { hits ->
+                val memories = hits.map { it.memory }
+                val person = hits.first().person
+                LocalRelevanceSearch.relevant(memories, query, 8).map { MemoryHit(it, person) }
+            }.sortedByDescending { it.memory.createdAt }.take(24)
+        }
     }
 
     Box(
@@ -89,60 +120,42 @@ fun SearchScreen(
                 .padding(top = 168.dp),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
+            item { NotionSectionHeader(title = "People", colors = colors) }
+            if (personHits.isEmpty()) {
+                item { GeneEmptyHint(colors = colors, message = "No people match this search.") }
+            }
+            items(personHits, key = { "person-${it.id}" }) { person ->
+                SearchPersonRow(person, colors) { onOpenPerson(person.id) }
+            }
+
             item {
+                Spacer(Modifier.height(14.dp))
                 NotionSectionHeader(title = "Chats", colors = colors)
             }
             if (sessionHits.isEmpty()) {
-                item {
-                    GeneEmptyHint(colors = colors, message = "No chats match this search.")
-                }
+                item { GeneEmptyHint(colors = colors, message = "No chats match this search.") }
             }
-            items(sessionHits, key = { "session-${it.id}" }) { session ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onOpenChat(session.id) }
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(28.dp)
-                            .clip(IconTileShape)
-                            .background(colors.pastel(session.id.toInt())),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Outlined.ChatBubbleOutline,
-                            contentDescription = "Chat",
-                            tint = colors.textPrimary.copy(alpha = 0.65f),
-                            modifier = Modifier.size(15.dp)
-                        )
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Text(
-                        session.title,
-                        color = colors.textPrimary,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium,
-                        fontFamily = GeneFontFamily,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+            items(sessionHits, key = { "session-${it.session.id}" }) { item ->
+                SearchSessionRow(item, colors) { onOpenChat(item.session.personId, item.session.id) }
             }
+
             item {
                 Spacer(Modifier.height(14.dp))
                 NotionSectionHeader(title = "Memories", colors = colors)
             }
             if (memoryHits.isEmpty()) {
-                item {
-                    GeneEmptyHint(colors = colors, message = "No memories match this search.")
-                }
+                item { GeneEmptyHint(colors = colors, message = "No memories match this search.") }
             }
-            items(memoryHits, key = { "memory-${it.id}" }) { memory ->
-                Box(Modifier.padding(horizontal = 14.dp, vertical = 4.dp)) {
-                    MemoryCard(memory, onClick = { onOpenMemory(memory.id) })
+            items(memoryHits, key = { "memory-${it.memory.id}" }) { hit ->
+                Column(Modifier.padding(horizontal = 14.dp, vertical = 4.dp)) {
+                    Text(
+                        hit.person.name,
+                        color = colors.textTertiary,
+                        fontSize = 12.sp,
+                        fontFamily = GeneFontFamily,
+                        modifier = Modifier.padding(bottom = 4.dp, start = 2.dp)
+                    )
+                    MemoryCard(hit.memory, onClick = { onOpenMemory(hit.person.id, hit.memory.id) })
                 }
             }
             item { Spacer(Modifier.height(40.dp)) }
@@ -174,7 +187,7 @@ fun SearchScreen(
                         fontFamily = GeneFontFamily
                     )
                     Text(
-                        person.name,
+                        "People, chats, and memories",
                         color = colors.textSecondary,
                         fontSize = 13.sp,
                         fontFamily = GeneFontFamily
@@ -187,7 +200,7 @@ fun SearchScreen(
                 hazeState = hazeState,
                 value = query,
                 onValueChange = { query = it },
-                placeholder = "Search memories and chats",
+                placeholder = "Search everything",
                 singleLine = true,
                 maxLines = 1,
                 leading = {
@@ -217,6 +230,104 @@ fun SearchScreen(
                         }
                     }
                 }
+            )
+        }
+    }
+}
+
+@Composable
+private fun SearchPersonRow(person: Person, colors: com.gene.app.ui.theme.GeneColors, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(IconTileShape)
+                .background(colors.pastel(person.id.toInt())),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Outlined.Person,
+                contentDescription = null,
+                tint = colors.textPrimary.copy(alpha = 0.65f),
+                modifier = Modifier.size(16.dp)
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                if (person.isSelf) person.name.ifBlank { "You" } else person.name,
+                color = colors.textPrimary,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
+                fontFamily = GeneFontFamily,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (person.note.isNotBlank()) {
+                Text(
+                    person.note,
+                    color = colors.textSecondary,
+                    fontSize = 12.sp,
+                    fontFamily = GeneFontFamily,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchSessionRow(
+    item: SessionWithPerson,
+    colors: com.gene.app.ui.theme.GeneColors,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(IconTileShape)
+                .background(colors.pastel(item.session.id.toInt())),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Outlined.ChatBubbleOutline,
+                contentDescription = null,
+                tint = colors.textPrimary.copy(alpha = 0.65f),
+                modifier = Modifier.size(15.dp)
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                item.session.title.ifBlank { "Untitled chat" },
+                color = colors.textPrimary,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
+                fontFamily = GeneFontFamily,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                item.personName,
+                color = colors.textSecondary,
+                fontSize = 12.sp,
+                fontFamily = GeneFontFamily,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }

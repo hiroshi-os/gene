@@ -2,6 +2,7 @@ package com.gene.app.ui.home
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -26,23 +27,22 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.Face
-import androidx.compose.material.icons.outlined.GraphicEq
+import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.Hub
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -51,7 +51,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -62,733 +61,588 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gene.app.data.GeneDatabase
-import com.gene.app.data.Interaction
 import com.gene.app.data.Person
-import com.gene.app.data.TYPE_AUDIO
-import com.gene.app.ui.common.AcrylicTabBar
+import com.gene.app.data.SessionWithPerson
+import com.gene.app.ui.common.GeneBarAction
+import com.gene.app.ui.common.GeneGlassInputBar
 import com.gene.app.ui.common.MemojiAvatar
 import com.gene.app.ui.common.MemojiConfig
 import com.gene.app.ui.common.MemojiMakerSheet
-import com.gene.app.ui.common.asIMessageTime
-import com.gene.app.ui.theme.GeneBlack
-import com.gene.app.ui.theme.GeneWhite
-import com.gene.app.ui.theme.IosBlue
-import com.gene.app.ui.theme.IosDarkAvatar
-import com.gene.app.ui.theme.IosDarkBg
-import com.gene.app.ui.theme.IosDarkBlue
-import com.gene.app.ui.theme.IosDarkDivider
-import com.gene.app.ui.theme.IosDarkSecondary
-import com.gene.app.ui.theme.IosLightAvatar
-import com.gene.app.ui.theme.IosLightBg
-import com.gene.app.ui.theme.IosLightDivider
-import com.gene.app.ui.theme.IosLightSecondary
+import com.gene.app.ui.common.NotionAcrylicDock
+import com.gene.app.ui.common.NotionListRow
+import com.gene.app.ui.common.NotionRecentCard
+import com.gene.app.ui.common.NotionSectionHeader
+import com.gene.app.ui.common.NotionTopChrome
+import com.gene.app.ui.common.asRelativeTime
+import com.gene.app.ui.common.geneHazeSource
+import com.gene.app.ui.common.rememberGeneHazeState
+import com.gene.app.ui.theme.GeneColors
+import com.gene.app.ui.theme.GeneFontFamily
+import com.gene.app.ui.theme.GeneSpace
+import com.gene.app.ui.theme.rememberGeneColors
+import dev.chrisbanes.haze.HazeState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     people: List<Person>,
     dark: Boolean,
+    selectedTab: Int = 0,
+    onTabSelected: (Int) -> Unit = {},
     onPerson: (Long) -> Unit,
     onSettings: () -> Unit,
+    onSearch: () -> Unit = {},
+    onSelf: () -> Unit,
     onPersonCreated: (String, String) -> Unit,
     onRefresh: () -> Unit,
+    onOpenChat: (personId: Long, sessionId: Long?) -> Unit = { _, _ -> },
+    onOpenGroupChat: (sessionId: Long) -> Unit = {},
+    onStartGroupChat: (memberIds: List<Long>) -> Unit = {},
+    onOpenGraph: () -> Unit = {},
+    onCapturePerson: (personId: Long) -> Unit = {},
+    onAskPerson: (personId: Long) -> Unit = {},
     db: GeneDatabase? = null
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) } // 0 = Messages, 1 = Contacts
-    var showNewMessage by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
-    var isSearchActive by remember { mutableStateOf(false) }
-    var editMenuExpanded by remember { mutableStateOf(false) }
+    var showNewPerson by remember { mutableStateOf(false) }
+    var showCapturePicker by remember { mutableStateOf(false) }
+    var showChatPicker by remember { mutableStateOf(false) }
+    var showGroupPicker by remember { mutableStateOf(false) }
+    var favoritesExpanded by remember { mutableStateOf(true) }
+    var allExpanded by remember { mutableStateOf(true) }
 
-    // Memoji customizer state
     var personForMemoji by remember { mutableStateOf<Person?>(null) }
-
-    // Long press / Action sheet state
     var selectedPersonForAction by remember { mutableStateOf<Person?>(null) }
     var editingPerson by remember { mutableStateOf<Person?>(null) }
     var personToDelete by remember { mutableStateOf<Person?>(null) }
 
-    val latestInteractions = remember(people) { db?.latestInteractions().orEmpty() }
-
-    // Theme-aware Apple iMessage / Contacts tokens
-    val bg = if (dark) IosDarkBg else IosLightBg
-    val textPrimary = if (dark) GeneWhite else GeneBlack
-    val textSecondary = if (dark) IosDarkSecondary else IosLightSecondary
-    val dividerColor = if (dark) IosDarkDivider else IosLightDivider
-    val accentBlue = if (dark) IosDarkBlue else IosBlue
-    val avatarBg = if (dark) IosDarkAvatar else IosLightAvatar
-
-    // Frosted acrylic glass tokens
-    val frostedHeaderBg = if (dark) Color(0xE0000000) else Color(0xEBFFFFFF)
-    val frostedSearchPillBg = if (dark) Color(0x3D767680) else Color(0x1F767680)
-    val frostedMenuBg = if (dark) Color(0xEA1C1C1E) else Color(0xF4F2F2F7)
-    val frostedSheetBg = if (dark) Color(0xF01C1C1E) else Color(0xF6FFFFFF)
-
-    val pinnedPeople = remember(people) { people.filter { it.favorite } }
-    val filteredPeople = remember(people, searchQuery) {
-        if (searchQuery.isBlank()) people
-        else people.filter {
-            it.name.contains(searchQuery, ignoreCase = true) || it.note.contains(searchQuery, ignoreCase = true)
-        }
+    val colors = rememberGeneColors(dark)
+    val hazeState = rememberGeneHazeState()
+    val self = remember(db) { db?.getOrCreateSelf() }
+    val captureTargets = remember(people, self) {
+        listOfNotNull(self) + people
     }
+    val allSessions = remember(people, selectedTab) { db?.allSessions().orEmpty() }
+    val favorites = remember(people) { people.filter { it.favorite } }
+    val recentPeople = remember(people) { people.sortedByDescending { it.lastSeen }.take(8) }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(bg)
+            .background(colors.bg)
     ) {
-        // Main Content: Messages (Tab 0) or Contacts (Tab 1)
-        if (selectedTab == 0) {
-            // PAGE 1: APPLE IMESSAGES
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = 108.dp, bottom = 90.dp)
-            ) {
-                // iOS Large Navigation Title: "Messages"
-                item {
-                    Text(
-                        text = "Messages",
-                        color = textPrimary,
-                        fontSize = 34.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = (-0.5).sp,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
-                    )
-                }
-
-                // iMessage Pinned Contacts Carousel (Floating Memoji Bubbles)
-                if (pinnedPeople.isNotEmpty() && searchQuery.isEmpty()) {
-                    item {
-                        LazyRow(
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(18.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            items(pinnedPeople, key = { "pinned_${it.id}" }) { person ->
-                                IMessagePinnedContact(
-                                    person = person,
-                                    latestInteraction = latestInteractions[person.id],
-                                    isDark = dark,
-                                    avatarBg = avatarBg,
-                                    textPrimary = textPrimary,
-                                    onClick = { onPerson(person.id) },
-                                    onLongClick = { selectedPersonForAction = person }
-                                )
-                            }
+        Box(Modifier.fillMaxSize().geneHazeSource(hazeState)) {
+            if (selectedTab == 0) {
+                PeopleHomeContent(
+                    colors = colors,
+                    recent = recentPeople,
+                    favorites = favorites,
+                    people = people,
+                    favoritesExpanded = favoritesExpanded,
+                    allExpanded = allExpanded,
+                    onToggleFavorites = { favoritesExpanded = !favoritesExpanded },
+                    onToggleAll = { allExpanded = !allExpanded },
+                    searchQuery = "",
+                    onPerson = onPerson,
+                    onCapture = onCapturePerson,
+                    onChat = { onOpenChat(it, null) },
+                    onLongPress = { selectedPersonForAction = it },
+                    onOpenGraph = onOpenGraph,
+                    onOpenSelf = onSelf
+                )
+            } else {
+                ChatsHomeContent(
+                    colors = colors,
+                    sessions = allSessions,
+                    searchQuery = "",
+                    onOpenChat = { pid, sid -> onOpenChat(pid, sid) },
+                    onOpenGroupChat = onOpenGroupChat,
+                    onStartChat = {
+                        when {
+                            captureTargets.isEmpty() -> showNewPerson = true
+                            captureTargets.size == 1 -> onOpenChat(captureTargets.first().id, null)
+                            else -> showChatPicker = true
                         }
-                        HorizontalDivider(color = dividerColor, thickness = 0.5.dp)
+                    },
+                    onStartGroupChat = {
+                        if (people.size < 2) showNewPerson = true
+                        else showGroupPicker = true
                     }
-                }
-
-                // Empty State
-                if (filteredPeople.isEmpty()) {
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 80.dp, start = 32.dp, end = 32.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(14.dp)
-                            ) {
-                                Text(
-                                    if (searchQuery.isNotBlank()) "No Results for \"$searchQuery\"" else "No Messages",
-                                    color = textSecondary,
-                                    fontSize = 17.sp,
-                                    fontWeight = FontWeight.Normal
-                                )
-                                if (searchQuery.isEmpty()) {
-                                    TextButton(
-                                        onClick = { showNewMessage = true },
-                                        colors = ButtonDefaults.textButtonColors(contentColor = accentBlue)
-                                    ) {
-                                        Text("Start a conversation", fontSize = 16.sp)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Conversation Rows
-                items(filteredPeople, key = { it.id }) { person ->
-                    IMessageChatRow(
-                        person = person,
-                        latestInteraction = latestInteractions[person.id],
-                        isDark = dark,
-                        textPrimary = textPrimary,
-                        textSecondary = textSecondary,
-                        dividerColor = dividerColor,
-                        accentBlue = accentBlue,
-                        avatarBg = avatarBg,
-                        onClick = { onPerson(person.id) },
-                        onLongClick = { selectedPersonForAction = person }
-                    )
-                }
+                )
             }
-        } else {
-            // PAGE 2: APPLE CONTACTS
-            AppleContactsView(
-                people = filteredPeople,
-                dark = dark,
-                textPrimary = textPrimary,
-                textSecondary = textSecondary,
-                dividerColor = dividerColor,
-                accentBlue = accentBlue,
-                avatarBg = avatarBg,
-                searchQuery = searchQuery,
-                onPersonClick = onPerson,
-                onAddPerson = { showNewMessage = true },
-                onCustomizeMemoji = { personForMemoji = it }
-            )
         }
 
-        // Floating Frosted Glass Header (Top Bar + Search Bar)
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            frostedHeaderBg,
-                            frostedHeaderBg,
-                            frostedHeaderBg.copy(alpha = 0.95f),
-                            Color.Transparent
-                        )
-                    )
-                )
                 .statusBarsPadding()
-                .padding(bottom = 8.dp)
+                .padding(bottom = 4.dp)
         ) {
-            // Top Navigation Action Row
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box {
-                    TextButton(
-                        onClick = { editMenuExpanded = true },
-                        colors = ButtonDefaults.textButtonColors(contentColor = accentBlue)
-                    ) {
-                        Text(if (selectedTab == 0) "Edit" else "Groups", fontSize = 17.sp, fontWeight = FontWeight.Normal)
-                    }
-                    DropdownMenu(
-                        expanded = editMenuExpanded,
-                        onDismissRequest = { editMenuExpanded = false },
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(frostedMenuBg)
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Settings", color = textPrimary) },
-                            onClick = { editMenuExpanded = false; onSettings() }
-                        )
-                    }
-                }
-
-                // Top Right Action: Compose Message or Add Contact
-                IconButton(onClick = { showNewMessage = true }) {
-                    Icon(
-                        if (selectedTab == 0) Icons.Outlined.Edit else Icons.Outlined.Add,
-                        contentDescription = if (selectedTab == 0) "New Message" else "Add Contact",
-                        tint = accentBlue,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-
-            // Floating Frosted Search Field
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(36.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(frostedSearchPillBg)
-                        .padding(horizontal = 10.dp),
-                    contentAlignment = Alignment.CenterStart
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(
-                            Icons.Outlined.Search,
-                            contentDescription = "Search",
-                            tint = textSecondary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        OutlinedTextField(
-                            value = searchQuery,
-                            onValueChange = { searchQuery = it; isSearchActive = true },
-                            placeholder = {
-                                Text("Search", color = textSecondary, fontSize = 16.sp)
-                            },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = Color.Transparent,
-                                unfocusedBorderColor = Color.Transparent,
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                focusedTextColor = textPrimary,
-                                unfocusedTextColor = textPrimary
-                            )
-                        )
-                        if (searchQuery.isNotEmpty()) {
-                            IconButton(
-                                onClick = { searchQuery = "" },
-                                modifier = Modifier.size(20.dp)
-                            ) {
-                                Icon(
-                                    Icons.Outlined.Close,
-                                    contentDescription = "Clear",
-                                    tint = textSecondary,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-
-                if (isSearchActive || searchQuery.isNotEmpty()) {
-                    TextButton(
-                        onClick = {
-                            searchQuery = ""
-                            isSearchActive = false
-                        },
-                        colors = ButtonDefaults.textButtonColors(contentColor = accentBlue),
-                        modifier = Modifier.padding(start = 4.dp)
-                    ) {
-                        Text("Cancel", fontSize = 16.sp)
-                    }
-                }
-            }
+            NotionTopChrome(
+                colors = colors,
+                selectedTab = selectedTab,
+                onTabSelected = onTabSelected,
+                onSettings = onSettings,
+                onNewPerson = { showNewPerson = true },
+                onSelf = onSelf,
+                selfName = self?.name ?: "You",
+                hazeState = hazeState
+            )
         }
 
-        // Floating Centered Shrunk Acrylic Tab Bar at the Bottom
-        AcrylicTabBar(
-            selectedTab = selectedTab,
-            onTabSelected = { selectedTab = it },
-            isDark = dark,
+        NotionAcrylicDock(
+            colors = colors,
+            hazeState = hazeState,
+            onSearch = onSearch,
+            onCapture = {
+                when {
+                    captureTargets.isEmpty() -> showNewPerson = true
+                    captureTargets.size == 1 -> onCapturePerson(captureTargets.first().id)
+                    else -> showCapturePicker = true
+                }
+            },
+            onChat = {
+                when {
+                    captureTargets.isEmpty() -> showNewPerson = true
+                    captureTargets.size == 1 -> onOpenChat(captureTargets.first().id, null)
+                    else -> showChatPicker = true
+                }
+            },
             modifier = Modifier.align(Alignment.BottomCenter)
         )
     }
 
-    // Modal: iOS "New Message / New Contact" Sheet
-    if (showNewMessage) {
-        NewMessageSheet(
-            isDark = dark,
-            sheetBg = frostedSheetBg,
-            textPrimary = textPrimary,
-            textSecondary = textSecondary,
-            accentBlue = accentBlue,
-            searchBg = frostedSearchPillBg,
-            onDismiss = { showNewMessage = false },
-            onCreate = { name, note ->
-                showNewMessage = false
-                onPersonCreated(name, note)
+    if (showNewPerson) {
+        NewPersonSheet(colors, onDismiss = { showNewPerson = false }) { name, note ->
+            showNewPerson = false
+            onPersonCreated(name, note)
+        }
+    }
+    if (showCapturePicker) {
+        PersonPickerSheet(
+            title = "Capture about…",
+            colors = colors,
+            people = captureTargets,
+            onDismiss = { showCapturePicker = false },
+            onPick = { showCapturePicker = false; onCapturePerson(it) }
+        )
+    }
+    if (showChatPicker) {
+        PersonPickerSheet(
+            title = "Chat about…",
+            colors = colors,
+            people = captureTargets,
+            onDismiss = { showChatPicker = false },
+            onPick = { showChatPicker = false; onOpenChat(it, null) }
+        )
+    }
+    if (showGroupPicker) {
+        GroupMemberPickerSheet(
+            colors = colors,
+            people = people,
+            onDismiss = { showGroupPicker = false },
+            onCreate = { ids ->
+                showGroupPicker = false
+                onStartGroupChat(ids)
             }
         )
     }
 
-    // Modal: Apple Memoji Character Maker
     personForMemoji?.let { person ->
         MemojiMakerSheet(
             initialConfig = MemojiConfig.deserialize(person.avatar),
             isDark = dark,
             onDismiss = { personForMemoji = null },
-            onSave = { newConfig ->
-                if (db != null) {
-                    db.updatePersonAvatar(person.id, newConfig.serialize())
-                    onRefresh()
-                }
+            onSave = { cfg ->
+                db?.updatePersonAvatar(person.id, cfg.serialize())
+                onRefresh()
                 personForMemoji = null
             }
         )
     }
 
-    // Modal: iOS Haptic Touch Action Sheet
     selectedPersonForAction?.let { person ->
-        IMessageActionSheet(
+        PersonActionSheet(
             person = person,
-            isDark = dark,
-            sheetBg = frostedSheetBg,
-            textPrimary = textPrimary,
-            textSecondary = textSecondary,
+            colors = colors,
             onDismiss = { selectedPersonForAction = null },
             onToggleFavorite = {
-                if (db != null) {
-                    db.setPersonFavorite(person.id, !person.favorite)
-                    onRefresh()
-                }
+                db?.setPersonFavorite(person.id, !person.favorite)
+                onRefresh()
                 selectedPersonForAction = null
             },
-            onEdit = {
-                editingPerson = person
-                selectedPersonForAction = null
-            },
-            onCustomizeMemoji = {
-                personForMemoji = person
-                selectedPersonForAction = null
-            },
-            onDelete = {
-                personToDelete = person
-                selectedPersonForAction = null
-            }
+            onEdit = { editingPerson = person; selectedPersonForAction = null },
+            onCustomizeMemoji = { personForMemoji = person; selectedPersonForAction = null },
+            onCapture = { onCapturePerson(person.id); selectedPersonForAction = null },
+            onChat = { onOpenChat(person.id, null); selectedPersonForAction = null },
+            onDelete = { personToDelete = person; selectedPersonForAction = null }
         )
     }
 
-    // Modal: Rename Contact Dialog
     editingPerson?.let { person ->
-        EditPersonDialog(
-            person = person,
-            isDark = dark,
-            textPrimary = textPrimary,
-            textSecondary = textSecondary,
-            accentBlue = accentBlue,
-            searchBg = frostedSearchPillBg,
-            onDismiss = { editingPerson = null },
-            onSave = { newName ->
-                if (db != null && newName.isNotBlank()) {
-                    db.updatePersonName(person.id, newName)
-                    onRefresh()
-                }
-                editingPerson = null
+        EditPersonDialog(person, colors, onDismiss = { editingPerson = null }) { newName ->
+            if (newName.isNotBlank()) {
+                db?.updatePersonName(person.id, newName)
+                onRefresh()
             }
-        )
+            editingPerson = null
+        }
     }
 
-    // Modal: Confirm Delete Dialog
     personToDelete?.let { person ->
         AlertDialog(
             onDismissRequest = { personToDelete = null },
-            title = { Text("Delete Contact?", color = textPrimary, fontWeight = FontWeight.Bold) },
-            text = { Text("Deleting will remove all recorded memories and chat history with ${person.name}.", color = textSecondary) },
+            title = { Text("Delete ${person.name}?", color = colors.textPrimary, fontWeight = FontWeight.Bold, fontFamily = GeneFontFamily) },
+            text = { Text("Removes all memories and chats for ${person.name}.", color = colors.textSecondary, fontFamily = GeneFontFamily) },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        if (db != null) {
-                            db.deletePerson(person.id)
-                            onRefresh()
-                        }
-                        personToDelete = null
-                    }
-                ) {
-                    Text("Delete", color = Color(0xFFFF3B30), fontWeight = FontWeight.Bold)
-                }
+                TextButton(onClick = {
+                    db?.deletePerson(person.id)
+                    onRefresh()
+                    personToDelete = null
+                }) { Text("Delete", color = colors.danger, fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
-                TextButton(onClick = { personToDelete = null }) {
-                    Text("Cancel", color = accentBlue)
-                }
+                TextButton(onClick = { personToDelete = null }) { Text("Cancel", color = colors.textSecondary) }
             },
-            containerColor = if (dark) Color(0xFF1C1C1E) else Color(0xFFF2F2F7)
+            containerColor = colors.surface
         )
     }
 }
 
-/**
- * Apple Contacts Page with Alphabetical Sections and "My Card" Header
- */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun AppleContactsView(
+private fun PeopleHomeContent(
+    colors: GeneColors,
+    recent: List<Person>,
+    favorites: List<Person>,
     people: List<Person>,
-    dark: Boolean,
-    textPrimary: Color,
-    textSecondary: Color,
-    dividerColor: Color,
-    accentBlue: Color,
-    avatarBg: Color,
+    favoritesExpanded: Boolean,
+    allExpanded: Boolean,
+    onToggleFavorites: () -> Unit,
+    onToggleAll: () -> Unit,
     searchQuery: String,
-    onPersonClick: (Long) -> Unit,
-    onAddPerson: () -> Unit,
-    onCustomizeMemoji: (Person) -> Unit
+    onPerson: (Long) -> Unit,
+    onCapture: (Long) -> Unit,
+    onChat: (Long) -> Unit,
+    onLongPress: (Person) -> Unit,
+    onOpenGraph: () -> Unit,
+    onOpenSelf: () -> Unit
 ) {
-    // Group people alphabetically
-    val grouped = remember(people) {
-        people.sortedBy { it.name.lowercase() }
-            .groupBy { it.name.firstOrNull()?.uppercaseChar() ?: '#' }
-    }
-
+    val haptic = LocalHapticFeedback.current
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(top = 108.dp, bottom = 90.dp)
+        contentPadding = PaddingValues(top = 100.dp, bottom = 100.dp)
     ) {
-        // iOS Large Title: "Contacts"
         item {
-            Text(
-                text = "Contacts",
-                color = textPrimary,
-                fontSize = 34.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = (-0.5).sp,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
-            )
-        }
-
-        // "My Card" Header (Apple Contacts style)
-        if (searchQuery.isEmpty()) {
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    MemojiAvatar(
-                        config = MemojiConfig(bgColor = accentBlue),
-                        size = 56.dp
-                    )
-                    Spacer(Modifier.width(16.dp))
-                    Column {
-                        Text(
-                            text = "My Card",
-                            color = textPrimary,
-                            fontSize = 19.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            text = "Tap to view profile & Memoji",
-                            color = textSecondary,
-                            fontSize = 13.sp
-                        )
-                    }
-                }
-                HorizontalDivider(color = dividerColor, thickness = 0.5.dp)
-            }
-        }
-
-        // Alphabetical Contact Sections (A, B, C...)
-        grouped.forEach { (letter, contactsInGroup) ->
-            item {
+            Column(Modifier.padding(horizontal = GeneSpace.lg, vertical = GeneSpace.xs)) {
                 Text(
-                    text = letter.toString(),
-                    color = textSecondary,
+                    "Gene",
+                    color = colors.textPrimary,
+                    fontSize = 28.sp,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                    fontFamily = GeneFontFamily,
+                    letterSpacing = (-0.5).sp
                 )
-            }
-
-            items(contactsInGroup, key = { it.id }) { person ->
+                Text(
+                    "Capture · patterns · talk about someone",
+                    color = colors.textSecondary,
+                    fontSize = 13.sp,
+                    fontFamily = GeneFontFamily
+                )
+                Spacer(Modifier.height(14.dp))
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onPersonClick(person.id) }
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Contact Memoji or Circular Initial
-                    if (!person.avatar.isNullOrBlank()) {
-                        MemojiAvatar(
-                            config = MemojiConfig.deserialize(person.avatar),
-                            size = 40.dp
-                        )
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(avatarBg),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = person.name.take(1).uppercase(),
-                                color = Color.White,
-                                fontSize = 17.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
-
-                    Spacer(Modifier.width(14.dp))
-
-                    Text(
-                        text = person.name,
-                        color = textPrimary,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Medium,
+                    ChatStartBento(
+                        title = "Relationships",
+                        subtitle = "People graph",
+                        icon = Icons.Outlined.Hub,
+                        colors = colors,
+                        filled = true,
+                        onClick = onOpenGraph,
                         modifier = Modifier.weight(1f)
                     )
+                    ChatStartBento(
+                        title = "You",
+                        subtitle = "Self profile",
+                        icon = Icons.Outlined.AccountCircle,
+                        colors = colors,
+                        filled = false,
+                        onClick = onOpenSelf,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+        }
 
-                    // Quick Memoji customizer button
-                    IconButton(
-                        onClick = { onCustomizeMemoji(person) },
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            Icons.Outlined.Face,
-                            contentDescription = "Edit Memoji",
-                            tint = textSecondary,
-                            modifier = Modifier.size(20.dp)
+        if (recent.isNotEmpty()) {
+            item { NotionSectionHeader("Recents", colors) }
+            item {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = GeneSpace.md, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(recent, key = { "r_${it.id}" }) { person ->
+                        NotionRecentCard(
+                            title = person.name,
+                            coverColor = colors.pastel(person.id.toInt()),
+                            colors = colors,
+                            onClick = { onPerson(person.id) },
+                            coverContent = { PersonAvatar(person, 52.dp, colors) },
+                            footerIcon = {
+                                Icon(Icons.Outlined.Person, null, tint = colors.textSecondary, modifier = Modifier.size(14.dp))
+                            }
                         )
                     }
                 }
-                HorizontalDivider(modifier = Modifier.padding(start = 70.dp), color = dividerColor, thickness = 0.5.dp)
+                Spacer(Modifier.height(10.dp))
             }
         }
 
-        // Contact Count Footer
-        item {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 24.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "${people.size} Contacts",
-                    color = textSecondary,
-                    fontSize = 14.sp
-                )
+        if (favorites.isNotEmpty()) {
+            item {
+                NotionSectionHeader("Favorites", colors, favoritesExpanded, onToggle = onToggleFavorites)
             }
-        }
-    }
-}
-
-/**
- * iMessage Pinned Contact Avatar with Floating Speech Bubble
- */
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-fun IMessagePinnedContact(
-    person: Person,
-    latestInteraction: Interaction?,
-    isDark: Boolean,
-    avatarBg: Color,
-    textPrimary: Color,
-    onClick: () -> Unit,
-    onLongClick: () -> Unit
-) {
-    val haptic = LocalHapticFeedback.current
-    val previewText = latestInteraction?.body?.take(22) ?: person.note.take(22)
-    val frostedBubbleBg = if (isDark) Color(0xCC2C2C2E) else Color(0xD8E5E5EA)
-
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .width(76.dp)
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onLongClick()
+            if (favoritesExpanded) {
+                items(favorites, key = { "f_${it.id}" }) { person ->
+                    PersonRow(
+                        person, colors,
+                        onClick = { onPerson(person.id) },
+                        onLongClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); onLongPress(person) },
+                        onCapture = { onCapture(person.id) },
+                        onChat = { onChat(person.id) }
+                    )
                 }
-            )
-    ) {
-        // Floating Frosted Glass Speech Bubble Preview (iMessage style)
-        if (previewText.isNotBlank()) {
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(frostedBubbleBg)
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = previewText,
-                    color = textPrimary,
-                    fontSize = 11.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
             }
-            Spacer(Modifier.height(4.dp))
+            item { Spacer(Modifier.height(6.dp)) }
         }
 
-        // 64dp Circular Memoji / Avatar
-        if (!person.avatar.isNullOrBlank()) {
-            MemojiAvatar(
-                config = MemojiConfig.deserialize(person.avatar),
-                size = 64.dp
+        item {
+            NotionSectionHeader(
+                if (searchQuery.isBlank()) "People" else "Results",
+                colors,
+                allExpanded,
+                onToggle = if (searchQuery.isBlank()) onToggleAll else null
             )
-        } else {
-            Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(CircleShape)
-                    .background(avatarBg),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = person.name.take(1).uppercase(),
-                    color = Color.White,
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.Bold
-                )
+        }
+        if (allExpanded || searchQuery.isNotBlank()) {
+            if (people.isEmpty()) {
+                item {
+                    EmptyHint(
+                        colors,
+                        if (searchQuery.isNotBlank()) "No people match \"$searchQuery\""
+                        else "Add someone — then capture a memory in one tap"
+                    )
+                }
+            } else {
+                items(people, key = { it.id }) { person ->
+                    PersonRow(
+                        person, colors,
+                        onClick = { onPerson(person.id) },
+                        onLongClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); onLongPress(person) },
+                        onCapture = { onCapture(person.id) },
+                        onChat = { onChat(person.id) }
+                    )
+                }
             }
         }
-
-        Spacer(Modifier.height(6.dp))
-
-        // Contact First Name
-        Text(
-            text = person.name.split(" ").firstOrNull() ?: person.name,
-            color = textPrimary,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Normal,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center
-        )
+        item {
+            Text(
+                "${people.size} ${if (people.size == 1) "person" else "people"}",
+                color = colors.textTertiary,
+                fontSize = 12.sp,
+                fontFamily = GeneFontFamily,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+        }
     }
 }
 
-/**
- * Apple iMessage Conversation Row
- */
+@Composable
+private fun ChatsHomeContent(
+    colors: GeneColors,
+    sessions: List<SessionWithPerson>,
+    searchQuery: String,
+    onOpenChat: (Long, Long) -> Unit,
+    onOpenGroupChat: (Long) -> Unit,
+    onStartChat: () -> Unit,
+    onStartGroupChat: () -> Unit
+) {
+    val recent = remember(sessions) { sessions.take(8) }
+    val favs = remember(sessions) { sessions.filter { it.session.favorite } }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(top = 100.dp, bottom = 100.dp)
+    ) {
+        item {
+            Column(Modifier.padding(horizontal = GeneSpace.lg, vertical = GeneSpace.xs)) {
+                Text("Chats", color = colors.textPrimary, fontSize = 28.sp, fontWeight = FontWeight.Bold, fontFamily = GeneFontFamily, letterSpacing = (-0.5).sp)
+                Text("Sessions across everyone", color = colors.textSecondary, fontSize = 13.sp, fontFamily = GeneFontFamily)
+                Spacer(Modifier.height(14.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    ChatStartBento(
+                        title = "Start chat",
+                        subtitle = "One person",
+                        icon = Icons.Outlined.ChatBubbleOutline,
+                        colors = colors,
+                        filled = true,
+                        onClick = onStartChat,
+                        modifier = Modifier.weight(1f)
+                    )
+                    ChatStartBento(
+                        title = "Start group chat",
+                        subtitle = "With @mentions",
+                        icon = Icons.Outlined.Groups,
+                        colors = colors,
+                        filled = false,
+                        onClick = onStartGroupChat,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+        }
+        if (searchQuery.isBlank() && recent.isNotEmpty()) {
+            item { NotionSectionHeader("Recents", colors) }
+            item {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = GeneSpace.md, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(recent, key = { "rs_${it.session.id}" }) { item ->
+                        NotionRecentCard(
+                            title = item.session.title.ifBlank { "Chat" },
+                            coverColor = colors.pastel(item.session.id.toInt()),
+                            colors = colors,
+                            onClick = {
+                                if (item.session.isGroup) onOpenGroupChat(item.session.id)
+                                else onOpenChat(item.session.personId, item.session.id)
+                            },
+                            coverContent = {
+                                Icon(
+                                    if (item.session.isGroup) Icons.Outlined.Groups else Icons.Outlined.ChatBubbleOutline,
+                                    null,
+                                    tint = colors.textPrimary.copy(alpha = 0.5f),
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            },
+                            footerIcon = {
+                                Icon(
+                                    if (item.session.isGroup) Icons.Outlined.Groups else Icons.Outlined.ChatBubbleOutline,
+                                    null,
+                                    tint = colors.textSecondary,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        )
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+            }
+        }
+        if (searchQuery.isBlank() && favs.isNotEmpty()) {
+            item { NotionSectionHeader("Favorites", colors) }
+            items(favs, key = { "fs_${it.session.id}" }) { item ->
+                SessionRow(item, colors) {
+                    if (item.session.isGroup) onOpenGroupChat(item.session.id)
+                    else onOpenChat(item.session.personId, item.session.id)
+                }
+            }
+        }
+        item { NotionSectionHeader(if (searchQuery.isBlank()) "All chats" else "Results", colors) }
+        if (sessions.isEmpty()) {
+            item {
+                EmptyHint(
+                    colors,
+                    if (searchQuery.isNotBlank()) "No chats match \"$searchQuery\""
+                    else "Start a chat or group — they’ll land here"
+                )
+            }
+        } else {
+            items(sessions, key = { it.session.id }) { item ->
+                SessionRow(item, colors) {
+                    if (item.session.isGroup) onOpenGroupChat(item.session.id)
+                    else onOpenChat(item.session.personId, item.session.id)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChatStartBento(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    colors: GeneColors,
+    filled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val shape = RoundedCornerShape(16.dp)
+    Column(
+        modifier = modifier
+            .height(96.dp)
+            .clip(shape)
+            .background(if (filled) colors.pillActive else colors.surface)
+            .border(0.5.dp, colors.border.copy(alpha = if (filled) 0f else 0.7f), shape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = if (filled) colors.onPillActive else colors.textPrimary,
+            modifier = Modifier.size(22.dp)
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                title,
+                color = if (filled) colors.onPillActive else colors.textPrimary,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                fontFamily = GeneFontFamily
+            )
+            Text(
+                subtitle,
+                color = if (filled) colors.onPillActive.copy(alpha = 0.75f) else colors.textSecondary,
+                fontSize = 12.sp,
+                fontFamily = GeneFontFamily
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun IMessageChatRow(
+private fun PersonRow(
     person: Person,
-    latestInteraction: Interaction?,
-    isDark: Boolean,
-    textPrimary: Color,
-    textSecondary: Color,
-    dividerColor: Color,
-    accentBlue: Color,
-    avatarBg: Color,
+    colors: GeneColors,
     onClick: () -> Unit,
-    onLongClick: () -> Unit
+    onLongClick: () -> Unit,
+    onCapture: () -> Unit,
+    onChat: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
-    val hasUnread = person.interactionCount > 0
-    val displayTime = latestInteraction?.createdAt?.asIMessageTime() ?: person.lastSeen.asIMessageTime()
-    val previewText = when {
-        latestInteraction != null -> {
-            if (latestInteraction.type == TYPE_AUDIO) "Voice message"
-            else latestInteraction.body
-        }
-        person.note.isNotBlank() -> person.note
-        else -> "New conversation"
-    }
-
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(
@@ -798,402 +652,415 @@ fun IMessageChatRow(
                     onLongClick()
                 }
             )
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 10.dp, bottom = 10.dp, end = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .size(32.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(colors.pastel(person.id.toInt())),
+            contentAlignment = Alignment.Center
         ) {
-            // Far Left: iOS Blue Unread Dot (10dp)
-            Box(
-                modifier = Modifier.width(28.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                if (hasUnread) {
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(accentBlue)
-                    )
-                }
-            }
-
-            // Contact Memoji / Avatar
             if (!person.avatar.isNullOrBlank()) {
-                MemojiAvatar(
-                    config = MemojiConfig.deserialize(person.avatar),
-                    size = 48.dp
-                )
+                MemojiAvatar(config = MemojiConfig.deserialize(person.avatar), size = 26.dp)
             } else {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(avatarBg),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = person.name.take(1).uppercase(),
-                        color = Color.White,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-            }
-
-            Spacer(Modifier.width(12.dp))
-
-            // Thread Content
-            Column(modifier = Modifier.weight(1f)) {
-                // Top line: Name + Timestamp
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = person.name,
-                        color = textPrimary,
-                        fontSize = 17.sp,
-                        fontWeight = if (hasUnread) FontWeight.Bold else FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = displayTime,
-                        color = textSecondary,
-                        fontSize = 14.sp
-                    )
-                }
-
-                Spacer(Modifier.height(3.dp))
-
-                // Bottom line: Preview snippet + right chevron
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (latestInteraction?.type == TYPE_AUDIO) {
-                            Icon(
-                                Icons.Outlined.GraphicEq,
-                                contentDescription = null,
-                                tint = textSecondary,
-                                modifier = Modifier.size(14.dp).padding(end = 4.dp)
-                            )
-                        }
-                        Text(
-                            text = previewText,
-                            color = textSecondary,
-                            fontSize = 15.sp,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            lineHeight = 20.sp
-                        )
-                    }
-                    Icon(
-                        Icons.Outlined.ChevronRight,
-                        contentDescription = null,
-                        tint = textSecondary.copy(alpha = 0.5f),
-                        modifier = Modifier.size(16.dp).padding(start = 4.dp)
-                    )
-                }
+                Text(person.name.take(1).uppercase(), color = colors.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeneFontFamily)
             }
         }
-
-        // iOS Table Inset Divider
-        HorizontalDivider(
-            modifier = Modifier.padding(start = 88.dp),
-            thickness = 0.5.dp,
-            color = dividerColor
-        )
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(person.name, color = colors.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Medium, fontFamily = GeneFontFamily, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, false))
+                if (person.favorite) {
+                    Spacer(Modifier.width(6.dp))
+                    Icon(Icons.Outlined.Star, null, tint = colors.textTertiary, modifier = Modifier.size(14.dp))
+                }
+            }
+            Text(
+                when {
+                    person.interactionCount > 0 -> "${person.interactionCount} memories"
+                    person.note.isNotBlank() -> person.note
+                    else -> "No memories yet"
+                },
+                color = colors.textSecondary,
+                fontSize = 12.sp,
+                fontFamily = GeneFontFamily,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        GeneBarAction(
+            onClick = onCapture,
+            colors = colors,
+            contentDescription = "Capture"
+        ) {
+            Icon(Icons.Outlined.EditNote, null, tint = colors.accent, modifier = Modifier.size(18.dp))
+        }
+        GeneBarAction(
+            onClick = onChat,
+            colors = colors,
+            contentDescription = "Chat"
+        ) {
+            Icon(Icons.Outlined.ChatBubbleOutline, null, tint = colors.textSecondary, modifier = Modifier.size(17.dp))
+        }
     }
 }
 
-/**
- * iOS New Message Compose Sheet
- */
+@Composable
+private fun SessionRow(item: SessionWithPerson, colors: GeneColors, onClick: () -> Unit) {
+    NotionListRow(
+        title = item.session.title.ifBlank { if (item.session.isGroup) "Group chat" else "Untitled chat" },
+        subtitle = "${item.personName} · ${item.session.updatedAt.asRelativeTime()}" +
+            if (item.session.messageCount > 0) " · ${item.session.messageCount} msgs" else "",
+        colors = colors,
+        tileColor = colors.pastel(item.session.id.toInt()),
+        onClick = onClick,
+        leading = {
+            Icon(
+                when {
+                    item.session.favorite -> Icons.Outlined.Star
+                    item.session.isGroup -> Icons.Outlined.Groups
+                    else -> Icons.Outlined.ChatBubbleOutline
+                },
+                null,
+                tint = colors.textPrimary,
+                modifier = Modifier.size(14.dp)
+            )
+        }
+    )
+}
+
+@Composable
+private fun PersonAvatar(person: Person, size: Dp, colors: GeneColors) {
+    if (!person.avatar.isNullOrBlank()) {
+        MemojiAvatar(config = MemojiConfig.deserialize(person.avatar), size = size)
+    } else {
+        Box(
+            Modifier.size(size).clip(CircleShape).background(colors.avatar),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(person.name.take(1).uppercase(), color = colors.textPrimary, fontSize = (size.value * 0.38f).sp, fontWeight = FontWeight.Bold, fontFamily = GeneFontFamily)
+        }
+    }
+}
+
+@Composable
+private fun HomeSearchField(
+    colors: GeneColors,
+    hazeState: HazeState?,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onClear: () -> Unit
+) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        GeneGlassInputBar(
+            colors = colors,
+            hazeState = hazeState,
+            value = query,
+            onValueChange = onQueryChange,
+            placeholder = "Search people or chats",
+            singleLine = true,
+            maxLines = 1,
+            modifier = Modifier.weight(1f),
+            leading = {
+                Icon(
+                    Icons.Outlined.Search,
+                    contentDescription = null,
+                    tint = colors.textSecondary,
+                    modifier = Modifier
+                        .padding(start = 2.dp)
+                        .size(18.dp)
+                )
+            },
+            trailing = {
+                if (query.isNotEmpty()) {
+                    GeneBarAction(
+                        onClick = { onQueryChange("") },
+                        muted = true,
+                        colors = colors,
+                        contentDescription = "Clear"
+                    ) {
+                        Icon(
+                            Icons.Outlined.Close,
+                            contentDescription = null,
+                            tint = colors.textSecondary,
+                            modifier = Modifier.size(15.dp)
+                        )
+                    }
+                }
+            }
+        )
+        TextButton(onClick = onClear) { Text("Cancel", color = colors.accent, fontSize = 14.sp, fontFamily = GeneFontFamily) }
+    }
+}
+
+@Composable
+private fun EmptyHint(colors: GeneColors, message: String) {
+    Box(Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 40.dp), contentAlignment = Alignment.Center) {
+        Text(message, color = colors.textSecondary, fontSize = 15.sp, fontFamily = GeneFontFamily)
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NewMessageSheet(
-    isDark: Boolean,
-    sheetBg: Color,
-    textPrimary: Color,
-    textSecondary: Color,
-    accentBlue: Color,
-    searchBg: Color,
-    onDismiss: () -> Unit,
-    onCreate: (String, String) -> Unit
-) {
+private fun NewPersonSheet(colors: GeneColors, onDismiss: () -> Unit, onCreate: (String, String) -> Unit) {
     var name by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
-
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-    }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = sheetBg
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(bottom = 24.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(
-                    onClick = onDismiss,
-                    colors = ButtonDefaults.textButtonColors(contentColor = accentBlue)
-                ) {
-                    Text("Cancel", fontSize = 17.sp)
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = colors.surface) {
+        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp).padding(bottom = 28.dp)) {
+            Text("New person", color = colors.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeneFontFamily)
+            Spacer(Modifier.height(6.dp))
+            Text("Then capture a memory right away.", color = colors.textSecondary, fontSize = 13.sp, fontFamily = GeneFontFamily)
+            Spacer(Modifier.height(16.dp))
+            OutlinedTextField(
+                value = name, onValueChange = { name = it },
+                placeholder = { Text("Name", color = colors.textTertiary) },
+                singleLine = true, modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
+                shape = RoundedCornerShape(10.dp), colors = fieldColors(colors)
+            )
+            Spacer(Modifier.height(10.dp))
+            OutlinedTextField(
+                value = note, onValueChange = { note = it },
+                placeholder = { Text("Note (optional)", color = colors.textTertiary) },
+                minLines = 2, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = {
+                    focusManager.clearFocus()
+                    if (name.isNotBlank()) onCreate(name.trim(), note.trim())
+                }),
+                colors = fieldColors(colors)
+            )
+            Spacer(Modifier.height(16.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onDismiss) { Text("Cancel", color = colors.textSecondary) }
+                TextButton(onClick = { if (name.isNotBlank()) onCreate(name.trim(), note.trim()) }, enabled = name.isNotBlank()) {
+                    Text("Create", color = colors.accent, fontWeight = FontWeight.Bold)
                 }
-                Text(
-                    "New Message",
-                    color = textPrimary,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-                TextButton(
-                    onClick = { if (name.isNotBlank()) onCreate(name.trim(), note.trim()) },
-                    enabled = name.isNotBlank(),
-                    colors = ButtonDefaults.textButtonColors(contentColor = accentBlue)
-                ) {
-                    Text("Done", fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-
-            HorizontalDivider(color = if (isDark) IosDarkDivider else IosLightDivider, thickness = 0.5.dp)
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("To:", color = textSecondary, fontSize = 16.sp)
-                Spacer(Modifier.width(8.dp))
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    placeholder = { Text("Name or Phone Number", color = textSecondary) },
-                    singleLine = true,
-                    modifier = Modifier
-                        .weight(1f)
-                        .focusRequester(focusRequester),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color.Transparent,
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        focusedTextColor = textPrimary,
-                        unfocusedTextColor = textPrimary
-                    )
-                )
-            }
-
-            HorizontalDivider(color = if (isDark) IosDarkDivider else IosLightDivider, thickness = 0.5.dp)
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.Top
-            ) {
-                Text("Note:", color = textSecondary, fontSize = 16.sp, modifier = Modifier.padding(top = 12.dp))
-                Spacer(Modifier.width(8.dp))
-                OutlinedTextField(
-                    value = note,
-                    onValueChange = { note = it },
-                    placeholder = { Text("Context or summary (optional)", color = textSecondary) },
-                    minLines = 3,
-                    modifier = Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = {
-                        focusManager.clearFocus()
-                        if (name.isNotBlank()) onCreate(name.trim(), note.trim())
-                    }),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color.Transparent,
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        focusedTextColor = textPrimary,
-                        unfocusedTextColor = textPrimary
-                    )
-                )
             }
         }
     }
 }
 
-/**
- * iOS Context Action Sheet with Memoji Customization Option
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun IMessageActionSheet(
+private fun PersonPickerSheet(
+    title: String,
+    colors: GeneColors,
+    people: List<Person>,
+    onDismiss: () -> Unit,
+    onPick: (Long) -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = colors.surface) {
+        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 24.dp)) {
+            Text(title, color = colors.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeneFontFamily, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+            if (people.isEmpty()) {
+                Text("Add a person first.", color = colors.textSecondary, modifier = Modifier.padding(20.dp), fontFamily = GeneFontFamily)
+            } else {
+                people.forEach { person ->
+                    val label = if (person.isSelf) person.name.ifBlank { "You" } else person.name
+                    PersonRow(
+                        person = person.copy(name = if (person.isSelf && person.name == "You") "You · self" else label),
+                        colors = colors,
+                        onClick = { onPick(person.id) },
+                        onLongClick = {},
+                        onCapture = { onPick(person.id) },
+                        onChat = { onPick(person.id) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun GroupMemberPickerSheet(
+    colors: GeneColors,
+    people: List<Person>,
+    onDismiss: () -> Unit,
+    onCreate: (List<Long>) -> Unit
+) {
+    var selected by remember { mutableStateOf(setOf<Long>()) }
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = colors.surface) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(bottom = 28.dp)
+        ) {
+            Text(
+                "New group chat",
+                color = colors.textPrimary,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold,
+                fontFamily = GeneFontFamily,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+            )
+            Text(
+                "Pick at least two people. @mention them in the chat to get replies.",
+                color = colors.textSecondary,
+                fontSize = 13.sp,
+                fontFamily = GeneFontFamily,
+                modifier = Modifier
+                    .padding(horizontal = 20.dp)
+                    .padding(bottom = 12.dp)
+            )
+            if (people.isEmpty()) {
+                Text("Add people first.", color = colors.textSecondary, modifier = Modifier.padding(20.dp), fontFamily = GeneFontFamily)
+            } else {
+                people.forEach { person ->
+                    val checked = person.id in selected
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                selected = if (checked) selected - person.id else selected + person.id
+                            }
+                            .padding(horizontal = 20.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(colors.pastel(person.id.toInt())),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                person.name.take(1).uppercase(),
+                                color = colors.textPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                fontFamily = GeneFontFamily
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            person.name,
+                            color = colors.textPrimary,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                            fontFamily = GeneFontFamily,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(22.dp)
+                                .clip(CircleShape)
+                                .background(if (checked) colors.pillActive else colors.pill)
+                                .border(0.5.dp, colors.border.copy(alpha = 0.5f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (checked) {
+                                Text("✓", color = colors.onPillActive, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel", color = colors.textSecondary, fontFamily = GeneFontFamily)
+                }
+                TextButton(
+                    onClick = { onCreate(selected.toList()) },
+                    enabled = selected.size >= 2
+                ) {
+                    Text(
+                        "Create group",
+                        color = if (selected.size >= 2) colors.accent else colors.textTertiary,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = GeneFontFamily
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PersonActionSheet(
     person: Person,
-    isDark: Boolean,
-    sheetBg: Color,
-    textPrimary: Color,
-    textSecondary: Color,
+    colors: GeneColors,
     onDismiss: () -> Unit,
     onToggleFavorite: () -> Unit,
     onEdit: () -> Unit,
     onCustomizeMemoji: () -> Unit,
+    onCapture: () -> Unit,
+    onChat: () -> Unit,
     onDelete: () -> Unit
 ) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = sheetBg
-    ) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = colors.surface) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp).padding(bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            Text(
-                person.name,
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                color = textPrimary,
-                modifier = Modifier.padding(vertical = 8.dp)
-            )
-
-            // Pin / Unpin
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .clickable(onClick = onToggleFavorite)
-                    .padding(vertical = 12.dp, horizontal = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Outlined.PushPin, contentDescription = null, tint = textPrimary)
-                Spacer(Modifier.width(14.dp))
-                Text(
-                    if (person.favorite) "Unpin" else "Pin",
-                    color = textPrimary,
-                    fontSize = 17.sp
-                )
-            }
-
-            // Customize Memoji
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .clickable(onClick = onCustomizeMemoji)
-                    .padding(vertical = 12.dp, horizontal = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Outlined.Face, contentDescription = null, tint = IosBlue)
-                Spacer(Modifier.width(14.dp))
-                Text("Customize Memoji", color = IosBlue, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-            }
-
-            // Edit Name
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .clickable(onClick = onEdit)
-                    .padding(vertical = 12.dp, horizontal = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Outlined.Edit, contentDescription = null, tint = textPrimary)
-                Spacer(Modifier.width(14.dp))
-                Text("Edit Name", color = textPrimary, fontSize = 17.sp)
-            }
-
-            // Delete Conversation
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .clickable(onClick = onDelete)
-                    .padding(vertical = 12.dp, horizontal = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Outlined.Delete, contentDescription = null, tint = Color(0xFFFF3B30))
-                Spacer(Modifier.width(14.dp))
-                Text("Delete Conversation", color = Color(0xFFFF3B30), fontSize = 17.sp)
-            }
+            Text(person.name, fontWeight = FontWeight.Bold, fontSize = 17.sp, color = colors.textPrimary, fontFamily = GeneFontFamily, modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp))
+            ActionRow(Icons.Outlined.EditNote, "Capture memory", colors.accent, onCapture)
+            ActionRow(Icons.Outlined.ChatBubbleOutline, "Chat", colors.textPrimary, onChat)
+            ActionRow(Icons.Outlined.PushPin, if (person.favorite) "Unpin" else "Pin", colors.textPrimary, onToggleFavorite)
+            ActionRow(Icons.Outlined.Face, "Customize Memoji", colors.accent, onCustomizeMemoji)
+            ActionRow(Icons.Outlined.Edit, "Rename", colors.textPrimary, onEdit)
+            ActionRow(Icons.Outlined.Delete, "Delete", colors.danger, onDelete)
         }
     }
 }
 
-/**
- * Edit Name Dialog
- */
 @Composable
-fun EditPersonDialog(
-    person: Person,
-    isDark: Boolean,
-    textPrimary: Color,
-    textSecondary: Color,
-    accentBlue: Color,
-    searchBg: Color,
-    onDismiss: () -> Unit,
-    onSave: (String) -> Unit
-) {
-    var name by remember { mutableStateOf(person.name) }
+private fun ActionRow(icon: ImageVector, label: String, tint: Color, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, null, tint = tint, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(14.dp))
+        Text(label, color = tint, fontSize = 16.sp, fontFamily = GeneFontFamily)
+    }
+}
 
+@Composable
+private fun EditPersonDialog(person: Person, colors: GeneColors, onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    var name by remember { mutableStateOf(person.name) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Edit Name", color = textPrimary, fontWeight = FontWeight.Bold) },
+        title = { Text("Rename", color = colors.textPrimary, fontWeight = FontWeight.Bold, fontFamily = GeneFontFamily) },
         text = {
             OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(10.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color.Transparent,
-                    unfocusedBorderColor = Color.Transparent,
-                    focusedContainerColor = searchBg,
-                    unfocusedContainerColor = searchBg,
-                    focusedTextColor = textPrimary,
-                    unfocusedTextColor = textPrimary
-                )
+                value = name, onValueChange = { name = it }, singleLine = true,
+                modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), colors = fieldColors(colors)
             )
         },
         confirmButton = {
-            TextButton(
-                onClick = { onSave(name.trim()) },
-                enabled = name.isNotBlank()
-            ) {
-                Text("Save", color = accentBlue, fontWeight = FontWeight.Bold)
+            TextButton(onClick = { onSave(name.trim()) }, enabled = name.isNotBlank()) {
+                Text("Save", color = colors.accent, fontWeight = FontWeight.Bold)
             }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = textSecondary)
-            }
-        },
-        containerColor = if (isDark) Color(0xFF1C1C1E) else Color(0xFFF2F2F7)
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = colors.textSecondary) } },
+        containerColor = colors.surface
     )
 }
+
+@Composable
+private fun fieldColors(colors: GeneColors) = OutlinedTextFieldDefaults.colors(
+    focusedBorderColor = Color.Transparent,
+    unfocusedBorderColor = Color.Transparent,
+    focusedContainerColor = Color.Transparent,
+    unfocusedContainerColor = Color.Transparent,
+    focusedTextColor = colors.textPrimary,
+    unfocusedTextColor = colors.textPrimary
+)

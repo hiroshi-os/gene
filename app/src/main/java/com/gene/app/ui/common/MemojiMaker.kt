@@ -50,7 +50,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.gene.app.ui.theme.IosBlue
+import com.gene.app.ui.theme.rememberGeneColors
+import com.gene.app.ui.theme.GeneFontFamily
 
 data class MemojiConfig(
     val skinColor: Color = Color(0xFFF0D5BE),
@@ -58,7 +59,7 @@ data class MemojiConfig(
     val hairColor: Color = Color(0xFF2C1B18),
     val eyeExpression: String = "happy", // happy, neutral, wink
     val glasses: String = "none", // none, round, square, sunglasses
-    val bgColor: Color = Color(0xFF007AFF)
+    val bgColor: Color = Color(0xFFD3E5EF)
 ) {
     fun serialize(): String = listOf(
         skinColor.value.toLong().toString(16),
@@ -80,7 +81,7 @@ data class MemojiConfig(
                     hairColor = Color(parts.getOrElse(2) { "FF2C1B18" }.toLong(16)),
                     eyeExpression = parts.getOrElse(3) { "happy" },
                     glasses = parts.getOrElse(4) { "none" },
-                    bgColor = Color(parts.getOrElse(5) { "FF007AFF" }.toLong(16))
+                    bgColor = Color(parts.getOrElse(5) { "FFD3E5EF" }.toLong(16))
                 )
             } catch (e: Exception) {
                 MemojiConfig()
@@ -102,9 +103,9 @@ val HairColorPalette = listOf(
 )
 
 val BgColorPalette = listOf(
-    Color(0xFF007AFF), Color(0xFF5856D6), Color(0xFFAF52DE),
-    Color(0xFFFF2D55), Color(0xFFFF9500), Color(0xFF34C759),
-    Color(0xFF5AC8FA), Color(0xFF8E8E93)
+    Color(0xFFFBF3DB), Color(0xFFF5E0E9), Color(0xFFE8DEEE),
+    Color(0xFFD3E5EF), Color(0xFFE2ECDC), Color(0xFFFADEC9),
+    Color(0xFFEBEBEA), Color(0xFF37352F)
 )
 
 val HairStyles = listOf("short", "curly", "bob", "wavy", "buzz", "bald")
@@ -321,7 +322,7 @@ private fun DrawScope.drawGlasses(style: String, w: Float, h: Float) {
 }
 
 /**
- * Apple Memoji Character Creator Sheet
+ * Memoji maker — Notion chrome
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -332,12 +333,13 @@ fun MemojiMakerSheet(
     onSave: (MemojiConfig) -> Unit
 ) {
     var config by remember { mutableStateOf(initialConfig) }
+    val colors = rememberGeneColors(isDark)
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("Skin", "Hair", "Eyes", "Glasses", "Color")
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = if (isDark) Color(0xFF1C1C1E) else Color(0xFFFFFFFF)
+        containerColor = colors.surface
     ) {
         Column(
             modifier = Modifier
@@ -355,16 +357,17 @@ fun MemojiMakerSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TextButton(onClick = onDismiss) {
-                    Text("Cancel", color = IosBlue, fontSize = 17.sp)
+                    Text("Cancel", color = colors.accent, fontSize = 15.sp, fontFamily = GeneFontFamily)
                 }
                 Text(
                     "Memoji",
                     fontWeight = FontWeight.Bold,
                     fontSize = 17.sp,
-                    color = if (isDark) Color.White else Color.Black
+                    color = colors.textPrimary,
+                    fontFamily = GeneFontFamily
                 )
                 TextButton(onClick = { onSave(config) }) {
-                    Text("Done", color = IosBlue, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                    Text("Done", color = colors.accent, fontWeight = FontWeight.Bold, fontSize = 15.sp, fontFamily = GeneFontFamily)
                 }
             }
 
@@ -391,7 +394,7 @@ fun MemojiMakerSheet(
                     )
                 }
             ) {
-                Icon(Icons.Outlined.Casino, "Randomize", tint = IosBlue)
+                Icon(Icons.Outlined.Casino, "Randomize", tint = colors.accent)
             }
 
             // Category Tab Row
@@ -408,7 +411,7 @@ fun MemojiMakerSheet(
                         text = {
                             Text(
                                 title,
-                                color = if (selectedTab == index) IosBlue else if (isDark) Color.Gray else Color.DarkGray,
+                                color = if (selectedTab == index) colors.accent else colors.textSecondary,
                                 fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal
                             )
                         }
@@ -506,21 +509,20 @@ private fun OptionChip(
     isDark: Boolean,
     onClick: () -> Unit
 ) {
+    val colors = rememberGeneColors(isDark)
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(
-                if (isSelected) IosBlue
-                else if (isDark) Color(0xFF2C2C2E) else Color(0xFFE5E5EA)
-            )
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (isSelected) colors.pillActive else colors.pill)
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .padding(horizontal = 14.dp, vertical = 9.dp)
     ) {
         Text(
             text = title,
-            color = if (isSelected) Color.White else if (isDark) Color.White else Color.Black,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-            fontSize = 14.sp
+            color = if (isSelected) colors.onPillActive else colors.textPrimary,
+            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+            fontSize = 13.sp,
+            fontFamily = GeneFontFamily
         )
     }
 }

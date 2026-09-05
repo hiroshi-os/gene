@@ -9,10 +9,29 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 object RemoteInsightEngine {
-    suspend fun personaReply(context: Context, person: Person, memories: List<Interaction>, sessionMessages: List<ChatMessage>, earlierMessages: List<ChatMessage>, question: String): PersonaReply {
+    suspend fun personaReply(
+        context: Context,
+        person: Person,
+        memories: List<Interaction>,
+        sessionMessages: List<ChatMessage>,
+        earlierMessages: List<ChatMessage>,
+        question: String,
+        peerNames: List<String> = emptyList()
+    ): PersonaReply {
         val localConfidence = LocalRelevanceSearch.confidence(memories, question)
         val localFallback = { InsightEngine.personaReply(person, memories, question) }
-        return complete(context, person, memories, sessionMessages, earlierMessages, question, personaMode = true, localConfidence, localFallback)
+        return complete(
+            context,
+            person,
+            memories,
+            sessionMessages,
+            earlierMessages,
+            question,
+            personaMode = true,
+            localConfidence,
+            localFallback,
+            peerNames = peerNames
+        )
     }
 
     suspend fun askAbout(context: Context, person: Person, memories: List<Interaction>, sessionMessages: List<ChatMessage>, earlierMessages: List<ChatMessage>, question: String): PersonaReply {
@@ -34,15 +53,37 @@ object RemoteInsightEngine {
         } catch (_: Exception) { InsightEngine.generatedSummary(person, memories) }
     }
 
-    private suspend fun complete(context: Context, person: Person, memories: List<Interaction>, sessionMessages: List<ChatMessage>, earlierMessages: List<ChatMessage>, question: String, personaMode: Boolean, localConfidence: Int, fallback: () -> PersonaReply): PersonaReply = withContext(Dispatchers.IO) {
+    private suspend fun complete(
+        context: Context,
+        person: Person,
+        memories: List<Interaction>,
+        sessionMessages: List<ChatMessage>,
+        earlierMessages: List<ChatMessage>,
+        question: String,
+        personaMode: Boolean,
+        localConfidence: Int,
+        fallback: () -> PersonaReply,
+        peerNames: List<String> = emptyList()
+    ): PersonaReply = withContext(Dispatchers.IO) {
         val prefs = context.getSharedPreferences("gene_settings", Context.MODE_PRIVATE)
         val endpoint = normalizeEndpoint(prefs.getString("llm_endpoint", "").orEmpty())
         val key = prefs.getString("llm_api_key", "").orEmpty().trim()
         if (endpoint == null || key.isBlank()) return@withContext fallback()
         try {
             val selectedContext = memories.joinToString("\n") { "- ${it.transcript ?: it.body.take(420)}" }.ifBlank { "No saved memory matched closely." }
+            val peerHint = peerNames
+                .map { it.trim() }
+                .filter { it.isNotBlank() && !it.equals(person.name, ignoreCase = true) }
+                .distinct()
+                .take(12)
+                .joinToString(", ") { "@$it" }
             val system = if (personaMode) {
-                "You are a conversational simulation of ${person.name}, reconstructed only from user-provided memories. Speak as a concise first-person approximation of this person, not as an analyst. Reply in one to three short natural sentences. Do not mention context, memories, references, confidence, prompts, or being an AI unless directly asked. Do not claim certainty about hidden thoughts. Do not use markdown, asterisks, bullets, labels, section headings, or phrases like Observation or Inference."
+                buildString {
+                    append("You are a conversational simulation of ${person.name}, reconstructed only from user-provided memories. Speak as a concise first-person approximation of this person, not as an analyst. Reply in one to three short natural sentences. Do not mention context, memories, references, confidence, prompts, or being an AI unless directly asked. Do not claim certainty about hidden thoughts. Do not use markdown, asterisks, bullets, labels, section headings, or phrases like Observation or Inference.")
+                    if (peerHint.isNotBlank()) {
+                        append(" This is a group chat. Other people present: $peerHint. If you want another person to weigh in, include their exact @Name in your reply.")
+                    }
+                }
             } else {
                 "You are Gene's concise relationship-context assistant. Answer the user's question about ${person.name} in third person using only the supplied memories. Be direct and useful in one to three short sentences. Separate observed evidence from speculation naturally without labels. Do not pretend to know hidden thoughts. Do not use markdown, asterisks, bullets, or long disclaimers."
             }

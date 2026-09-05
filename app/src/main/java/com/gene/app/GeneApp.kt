@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -18,6 +19,8 @@ import com.gene.app.data.GeneDatabase
 import com.gene.app.ui.calendar.CalendarScreen
 import com.gene.app.ui.chat.AllChatsScreen
 import com.gene.app.ui.chat.ChatScreen
+import com.gene.app.ui.chat.GroupChatScreen
+import com.gene.app.ui.graph.RelationshipGraphScreen
 import com.gene.app.ui.home.HomeScreen
 import com.gene.app.ui.memory.AllMemoriesScreen
 import com.gene.app.ui.memory.MemoryDetailScreen
@@ -25,22 +28,30 @@ import com.gene.app.ui.navigation.AppScreen
 import com.gene.app.ui.navigation.CHAT_ASK
 import com.gene.app.ui.navigation.CHAT_TALK
 import com.gene.app.ui.person.PersonScreen
+import com.gene.app.ui.search.GlobalSearchScreen
 import com.gene.app.ui.search.SearchScreen
 import com.gene.app.ui.settings.SettingsScreen
-import com.gene.app.ui.theme.GeneBlack
 import com.gene.app.ui.theme.GeneTheme
-import com.gene.app.ui.theme.GeneWhite
+import com.gene.app.ui.theme.NotionDarkBg
+import com.gene.app.ui.theme.NotionLightBg
 
 @Composable
-fun GeneApp(initialPersonId: Long = -1L) {
+fun GeneApp(initialPersonId: Long = -1L, initialOpenCapture: Boolean = false) {
     val context = LocalContext.current
     val view = LocalView.current
     val prefs = remember { context.getSharedPreferences("gene_settings", Context.MODE_PRIVATE) }
     val db = remember { GeneDatabase(context.applicationContext) }
     var dark by remember { mutableStateOf(prefs.getBoolean("dark_mode", false)) }
-    var screen by remember { mutableStateOf<AppScreen>(if (initialPersonId > 0) AppScreen.PersonDetail(initialPersonId) else AppScreen.Home) }
+    var screen by remember {
+        mutableStateOf<AppScreen>(
+            if (initialPersonId > 0) AppScreen.PersonDetail(initialPersonId, openCapture = initialOpenCapture)
+            else AppScreen.Home
+        )
+    }
     var refresh by remember { mutableStateOf(0) }
+    var homeTab by remember { mutableIntStateOf(0) }
     val people = remember(refresh) { db.people() }
+    LaunchedEffect(Unit) { db.getOrCreateSelf() }
     val toggleDark = {
         val next = !dark
         dark = next
@@ -58,8 +69,9 @@ fun GeneApp(initialPersonId: Long = -1L) {
 
     SideEffect {
         val window = (view.context as Activity).window
-        window.statusBarColor = if (dark) GeneBlack.toArgb() else GeneWhite.toArgb()
-        window.navigationBarColor = if (dark) GeneBlack.toArgb() else GeneWhite.toArgb()
+        val bar = if (dark) NotionDarkBg else NotionLightBg
+        window.statusBarColor = bar.toArgb()
+        window.navigationBarColor = bar.toArgb()
         WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !dark
         WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !dark
     }
@@ -67,12 +79,14 @@ fun GeneApp(initialPersonId: Long = -1L) {
     BackHandler(enabled = screen != AppScreen.Home) {
         screen = when (val current = screen) {
             is AppScreen.Chat -> AppScreen.PersonDetail(current.personId)
+            is AppScreen.GroupChat -> AppScreen.Home
+            is AppScreen.RelationshipGraph -> AppScreen.Home
             is AppScreen.Search -> AppScreen.PersonDetail(current.personId)
             is AppScreen.AllChats -> AppScreen.PersonDetail(current.personId)
             is AppScreen.Calendar -> AppScreen.PersonDetail(current.personId)
             is AppScreen.AllMemories -> AppScreen.PersonDetail(current.personId)
             is AppScreen.MemoryDetail -> AppScreen.PersonDetail(current.personId)
-            is AppScreen.PersonDetail, AppScreen.Settings -> AppScreen.Home
+            AppScreen.GlobalSearch, is AppScreen.PersonDetail, AppScreen.Settings -> AppScreen.Home
             AppScreen.Home -> AppScreen.Home
         }
     }
@@ -82,15 +96,65 @@ fun GeneApp(initialPersonId: Long = -1L) {
             AppScreen.Home -> HomeScreen(
                 people = people,
                 dark = dark,
+                selectedTab = homeTab,
+                onTabSelected = { homeTab = it },
                 onPerson = { screen = AppScreen.PersonDetail(it) },
                 onSettings = { screen = AppScreen.Settings },
+                onSearch = { screen = AppScreen.GlobalSearch },
+                onSelf = {
+                    val self = db.getOrCreateSelf()
+                    screen = AppScreen.PersonDetail(self.id)
+                },
                 onPersonCreated = { name, note ->
                     val id = db.addPerson(name, note)
                     refresh++
-                    screen = AppScreen.PersonDetail(id)
+                    screen = AppScreen.PersonDetail(id, openCapture = true)
                 },
                 onRefresh = { refresh++ },
+                onOpenChat = { personId, sessionId ->
+                    val session = sessionId?.let { db.session(it) }
+                    if (session?.isGroup == true) {
+                        homeTab = 1
+                        screen = AppScreen.GroupChat(session.id)
+                    } else {
+                        screen = AppScreen.Chat(personId, sessionId, CHAT_TALK)
+                    }
+                },
+                onOpenGroupChat = { sessionId ->
+                    homeTab = 1
+                    screen = AppScreen.GroupChat(sessionId)
+                },
+                onStartGroupChat = { memberIds ->
+                    val id = db.addGroupSession(memberIds)
+                    refresh++
+                    if (id > 0) {
+                        homeTab = 1
+                        screen = AppScreen.GroupChat(id)
+                    }
+                },
+                onOpenGraph = { screen = AppScreen.RelationshipGraph },
+                onCapturePerson = { personId ->
+                    screen = AppScreen.PersonDetail(personId, openCapture = true)
+                },
+                onAskPerson = { personId ->
+                    screen = AppScreen.Chat(personId, null, CHAT_ASK)
+                },
                 db = db
+            )
+            AppScreen.GlobalSearch -> GlobalSearchScreen(
+                db = db,
+                onBack = { screen = AppScreen.Home },
+                onOpenPerson = { screen = AppScreen.PersonDetail(it) },
+                onOpenChat = { personId, sessionId ->
+                    val session = db.session(sessionId)
+                    if (session?.isGroup == true) {
+                        homeTab = 1
+                        screen = AppScreen.GroupChat(sessionId)
+                    } else screen = AppScreen.Chat(personId, sessionId, CHAT_TALK)
+                },
+                onOpenMemory = { personId, memoryId ->
+                    screen = AppScreen.MemoryDetail(personId, memoryId)
+                }
             )
             is AppScreen.PersonDetail -> {
                 val person = db.person(current.id)
@@ -102,6 +166,7 @@ fun GeneApp(initialPersonId: Long = -1L) {
                         memories = db.interactions(person.id),
                         dark = dark,
                         context = context,
+                        openCapture = current.openCapture,
                         onOpenChat = { sessionId, mode -> screen = AppScreen.Chat(person.id, sessionId, mode) },
                         onAsk = { screen = AppScreen.Chat(person.id, null, CHAT_ASK) },
                         onSearch = { screen = AppScreen.Search(person.id) },
@@ -187,6 +252,8 @@ fun GeneApp(initialPersonId: Long = -1L) {
                 val session = current.sessionId?.let { db.session(it) }
                 if (person == null || (current.sessionId != null && session == null)) {
                     screen = AppScreen.Home
+                } else if (session?.isGroup == true) {
+                    screen = AppScreen.GroupChat(session.id)
                 } else {
                     ChatScreen(
                         person = person,
@@ -198,6 +265,32 @@ fun GeneApp(initialPersonId: Long = -1L) {
                     )
                 }
             }
+            is AppScreen.GroupChat -> {
+                val session = db.session(current.sessionId)
+                if (session == null || !session.isGroup) {
+                    screen = AppScreen.Home
+                } else {
+                    GroupChatScreen(
+                        session = session,
+                        db = db,
+                        context = context,
+                        onBack = {
+                            refresh++
+                            screen = AppScreen.Home
+                        }
+                    )
+                }
+            }
+            AppScreen.RelationshipGraph -> RelationshipGraphScreen(
+                db = db,
+                onBack = {
+                    refresh++
+                    screen = AppScreen.Home
+                },
+                onOpenPerson = { personId ->
+                    screen = AppScreen.PersonDetail(personId)
+                }
+            )
             AppScreen.Settings -> SettingsScreen(
                 dark = dark,
                 onToggleTheme = toggleDark,

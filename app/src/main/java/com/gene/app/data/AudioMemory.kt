@@ -61,6 +61,15 @@ class AudioRecorder(private val context: Context) {
         }
     }
 
+    fun amplitude(): Float {
+        val current = recorder ?: return 0f
+        return try {
+            (current.maxAmplitude / 32768f).coerceIn(0f, 1f)
+        } catch (_: Exception) {
+            0f
+        }
+    }
+
     fun release() { if (recorder != null) stop() }
 }
 

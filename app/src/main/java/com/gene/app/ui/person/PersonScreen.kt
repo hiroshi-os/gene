@@ -2,7 +2,10 @@ package com.gene.app.ui.person
 
 import android.content.Context
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,47 +19,36 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
-import com.gene.app.ui.common.MemojiAvatar
-import com.gene.app.ui.common.MemojiConfig
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Event
+import androidx.compose.material.icons.outlined.FormatQuote
 import androidx.compose.material.icons.outlined.HelpOutline
-import androidx.compose.material.icons.outlined.Lightbulb
-import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.outlined.ViewList
 import androidx.compose.material.icons.outlined.ViewModule
-import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -66,12 +58,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.gene.app.data.GeneDatabase
 import com.gene.app.data.InsightEngine
 import com.gene.app.data.Interaction
@@ -79,14 +73,42 @@ import com.gene.app.data.Person
 import com.gene.app.data.RemoteInsightEngine
 import com.gene.app.ui.chat.ChatPreviewCard
 import com.gene.app.ui.chat.ChatPreviewMoreCard
+import com.gene.app.ui.common.GeneGlassDropdownMenu
+import com.gene.app.ui.common.GeneGlassIconButton
+import com.gene.app.ui.common.MemojiAvatar
+import com.gene.app.ui.common.MemojiConfig
+import com.gene.app.ui.common.QuickActionChip
 import com.gene.app.ui.common.asDate
-import com.gene.app.ui.memory.CaptureSheet
+import com.gene.app.ui.common.geneGlassMenuItemColors
+import com.gene.app.ui.common.geneHazeSource
+import com.gene.app.ui.common.rememberGeneHazeState
 import com.gene.app.ui.memory.MasonryMemoryGallery
 import com.gene.app.ui.memory.MemoryCard
 import com.gene.app.ui.navigation.CHAT_TALK
-import com.gene.app.ui.theme.GeneGray
+import com.gene.app.ui.theme.GeneColors
+import com.gene.app.ui.theme.GeneFontFamily
+import com.gene.app.ui.theme.GeneRadius
+import com.gene.app.ui.theme.GeneSpace
+import com.gene.app.ui.theme.rememberGeneColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+private val SheetShape = RoundedCornerShape(topStart = GeneRadius.lg, topEnd = GeneRadius.lg)
+private val CardShape = RoundedCornerShape(GeneRadius.lg)
+private val TraitShape = RoundedCornerShape(GeneRadius.sm)
+private val FieldShape = RoundedCornerShape(GeneRadius.sm)
+private val ButtonShape = RoundedCornerShape(GeneRadius.sm)
+
+@Composable
+private fun PersonSectionLabel(title: String, colors: GeneColors) {
+    Text(
+        text = title,
+        color = colors.textSecondary,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.Medium,
+        fontFamily = GeneFontFamily
+    )
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -95,6 +117,7 @@ fun PersonScreen(
     memories: List<Interaction>,
     dark: Boolean,
     context: Context,
+    openCapture: Boolean = false,
     onOpenChat: (Long?, String) -> Unit,
     onAsk: () -> Unit,
     onSearch: () -> Unit,
@@ -106,7 +129,8 @@ fun PersonScreen(
     onChanged: () -> Unit,
     db: GeneDatabase
 ) {
-    var capture by remember { mutableStateOf(false) }
+    val colors = rememberGeneColors(dark)
+    val hazeState = rememberGeneHazeState()
     val prefs = remember { context.getSharedPreferences("gene_settings", Context.MODE_PRIVATE) }
     val memoryLayoutKey = "memory_grid_${person.id}"
     var memoryGrid by remember(person.id) { mutableStateOf(prefs.getBoolean(memoryLayoutKey, true)) }
@@ -122,6 +146,10 @@ fun PersonScreen(
     val quoteSet = remember(memories) { memories.filter { it.type == "quote" }.shuffled().take(3) }
     var quoteIndex by remember(person.id) { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
+    val regenInteraction = remember { MutableInteractionSource() }
+    val layoutInteraction = remember { MutableInteractionSource() }
+    val seeAllChatsInteraction = remember { MutableInteractionSource() }
+    val seeAllMemoriesInteraction = remember { MutableInteractionSource() }
 
     LaunchedEffect(quoteSet.size) {
         if (quoteSet.size > 1) {
@@ -150,19 +178,402 @@ fun PersonScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(person.name, style = MaterialTheme.typography.titleMedium) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, "Back", tint = IosBlue) } },
-                actions = {
-                    IconButton(onClick = onSearch) { Icon(Icons.Outlined.Search, "Search", tint = IosBlue) }
-                    Box {
-                        IconButton(onClick = { personaMenuOpen = true }) { Icon(Icons.Outlined.MoreVert, "Person actions", tint = IosBlue) }
-                        DropdownMenu(expanded = personaMenuOpen, onDismissRequest = { personaMenuOpen = false }) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.bg)
+    ) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .geneHazeSource(hazeState)
+                .statusBarsPadding()
+                .padding(top = 56.dp),
+            contentPadding = PaddingValues(
+                start = GeneSpace.lg,
+                end = GeneSpace.lg,
+                bottom = 140.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(GeneSpace.md)
+        ) {
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = GeneSpace.sm, bottom = GeneSpace.xs),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    if (!person.avatar.isNullOrBlank()) {
+                        MemojiAvatar(
+                            config = MemojiConfig.deserialize(person.avatar),
+                            size = 72.dp
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(72.dp)
+                                .clip(CircleShape)
+                                .background(colors.pastel(person.id.toInt())),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = person.name.take(1).uppercase(),
+                                color = colors.textPrimary,
+                                fontSize = 28.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = GeneFontFamily
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(GeneSpace.sm))
+                    Text(
+                        text = person.name,
+                        color = colors.textPrimary,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = GeneFontFamily,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = when {
+                            person.isSelf -> "Your profile · notes about yourself"
+                            person.note.isNotBlank() -> person.note
+                            else -> ""
+                        },
+                        color = colors.textSecondary,
+                        fontSize = 13.sp,
+                        fontFamily = GeneFontFamily,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        QuickActionChip(
+                            label = "Chat",
+                            icon = Icons.Outlined.ChatBubbleOutline,
+                            colors = colors,
+                            onClick = { onOpenChat(null, CHAT_TALK) },
+                            filled = true
+                        )
+                        QuickActionChip(
+                            label = "Ask",
+                            icon = Icons.Outlined.HelpOutline,
+                            colors = colors,
+                            onClick = onAsk
+                        )
+                        QuickActionChip(
+                            label = "Calendar",
+                            icon = Icons.Outlined.Event,
+                            colors = colors,
+                            onClick = onCalendar
+                        )
+                    }
+                }
+            }
+
+            item {
+                PersonSectionLabel("Summary", colors)
+                Spacer(Modifier.height(GeneSpace.xs))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(CardShape)
+                        .background(colors.pastel(0).copy(alpha = if (dark) 0.55f else 0.95f))
+                        .border(0.5.dp, colors.border.copy(alpha = 0.6f), CardShape)
+                        .padding(GeneSpace.md),
+                    verticalArrangement = Arrangement.spacedBy(GeneSpace.sm)
+                ) {
+                    if (memories.size >= 10) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = if (summaryRefreshing) "Refreshing…" else if (person.isSelf) "About you" else "About ${person.name}",
+                                color = colors.textSecondary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                fontFamily = GeneFontFamily,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(colors.pill)
+                                    .clickable(
+                                        interactionSource = regenInteraction,
+                                        indication = null,
+                                        enabled = !summaryRefreshing,
+                                        onClick = { regenerateSummary() }
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Refresh,
+                                    contentDescription = "Regenerate summary",
+                                    tint = colors.textSecondary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                        Text(
+                            text = displayedSummary ?: "Building a clearer picture…",
+                            color = colors.textPrimary,
+                            fontSize = 14.sp,
+                            fontFamily = GeneFontFamily,
+                            lineHeight = 21.sp
+                        )
+                    } else {
+                        Text(
+                            text = "Add ${10 - memories.size} more memor${if (10 - memories.size == 1) "y" else "ies"} for a generated summary.",
+                            color = colors.textSecondary,
+                            fontSize = 13.sp,
+                            fontFamily = GeneFontFamily
+                        )
+                    }
+                }
+            }
+
+            if (persona.traits.isNotEmpty()) {
+                item {
+                    PersonSectionLabel("Traits", colors)
+                    Spacer(Modifier.height(GeneSpace.xs))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(GeneSpace.xs)
+                    ) {
+                        persona.traits.forEachIndexed { index, trait ->
+                            Text(
+                                text = trait,
+                                color = colors.textPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                fontFamily = GeneFontFamily,
+                                modifier = Modifier
+                                    .clip(TraitShape)
+                                    .background(colors.pastel(index + 1))
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (quoteSet.isNotEmpty()) {
+                item {
+                    PersonSectionLabel("Quotes", colors)
+                    Spacer(Modifier.height(GeneSpace.xs))
+                    QuoteCarousel(quoteSet, quoteIndex, colors)
+                }
+            }
+
+            if (sessions.isNotEmpty()) {
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Chats",
+                            color = colors.textSecondary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            fontFamily = GeneFontFamily,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(GeneRadius.xs))
+                                .clickable(
+                                    interactionSource = seeAllChatsInteraction,
+                                    indication = null,
+                                    onClick = onAllChats
+                                )
+                                .padding(vertical = 4.dp, horizontal = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "See all",
+                                color = colors.textTertiary,
+                                fontSize = 13.sp,
+                                fontFamily = GeneFontFamily
+                            )
+                            Icon(
+                                Icons.Outlined.ChevronRight,
+                                contentDescription = "See all chats",
+                                tint = colors.textTertiary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(GeneSpace.xs))
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(GeneSpace.sm),
+                        contentPadding = PaddingValues(end = GeneSpace.xs)
+                    ) {
+                        items(sessions.take(5), key = { "preview-${it.id}" }) { session ->
+                            ChatPreviewCard(session, onClick = { onOpenChat(session.id, CHAT_TALK) })
+                        }
+                        if (sessions.size > 5) {
+                            item { ChatPreviewMoreCard(onClick = onAllChats) }
+                        }
+                    }
+                }
+            }
+
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Memories",
+                        color = colors.textSecondary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        fontFamily = GeneFontFamily,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (memories.size > 10) {
+                        Text(
+                            text = "Show all",
+                            color = colors.accent,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            fontFamily = GeneFontFamily,
+                            modifier = Modifier
+                                .clickable(
+                                    interactionSource = seeAllMemoriesInteraction,
+                                    indication = null,
+                                    onClick = onAllMemories
+                                )
+                                .padding(end = GeneSpace.xs)
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(colors.pill)
+                            .clickable(
+                                interactionSource = layoutInteraction,
+                                indication = null,
+                                onClick = {
+                                    memoryGrid = !memoryGrid
+                                    prefs.edit().putBoolean(memoryLayoutKey, memoryGrid).apply()
+                                }
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            if (memoryGrid) Icons.Outlined.ViewList else Icons.Outlined.ViewModule,
+                            contentDescription = if (memoryGrid) "List view" else "Grid view",
+                            tint = colors.textSecondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+
+            if (memories.isEmpty()) {
+                item {
+                    Text(
+                        text = "Capture something below — notes show up here.",
+                        color = colors.textTertiary,
+                        fontSize = 14.sp,
+                        fontFamily = GeneFontFamily,
+                        modifier = Modifier.padding(top = GeneSpace.xs, bottom = GeneSpace.sm)
+                    )
+                }
+            }
+            if (memoryGrid && memories.isNotEmpty()) {
+                item { MasonryMemoryGallery(memories.take(10), onMemory) }
+            } else if (!memoryGrid) {
+                items(memories.take(10), key = { it.id }) { memory ->
+                    MemoryCard(memory, onClick = { onMemory(memory.id) })
+                }
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(horizontal = GeneSpace.sm, vertical = 6.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                GeneGlassIconButton(
+                    colors = colors,
+                    hazeState = hazeState,
+                    onClick = onBack,
+                    contentDescription = "Back"
+                ) {
+                    Icon(Icons.Outlined.ArrowBack, null, tint = colors.textPrimary, modifier = Modifier.size(18.dp))
+                }
+                Spacer(Modifier.weight(1f))
+                GeneGlassIconButton(
+                    colors = colors,
+                    hazeState = hazeState,
+                    onClick = onSearch,
+                    contentDescription = "Search"
+                ) {
+                    Icon(Icons.Outlined.Search, null, tint = colors.textPrimary, modifier = Modifier.size(18.dp))
+                }
+                Box {
+                    GeneGlassIconButton(
+                        colors = colors,
+                        hazeState = hazeState,
+                        onClick = { personaMenuOpen = true },
+                        contentDescription = "Person actions"
+                    ) {
+                        Icon(Icons.Outlined.MoreHoriz, null, tint = colors.textPrimary, modifier = Modifier.size(18.dp))
+                    }
+                    GeneGlassDropdownMenu(
+                        expanded = personaMenuOpen,
+                        onDismissRequest = { personaMenuOpen = false },
+                        colors = colors,
+                        hazeState = hazeState
+                    ) {
+                        val itemColors = geneGlassMenuItemColors(colors)
+                        if (!person.isSelf) {
                             DropdownMenuItem(
-                                text = { Text(if (personFavorite) "Unfavorite" else "Favorite") },
-                                leadingIcon = { Icon(if (personFavorite) Icons.Outlined.Star else Icons.Outlined.StarBorder, null) },
+                                text = {
+                                    Text(
+                                        if (personFavorite) "Unfavorite" else "Favorite",
+                                        fontFamily = GeneFontFamily
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        if (personFavorite) Icons.Outlined.Star else Icons.Outlined.StarBorder,
+                                        null,
+                                        tint = colors.textSecondary
+                                    )
+                                },
+                                colors = itemColors,
                                 onClick = {
                                     personFavorite = !personFavorite
                                     db.setPersonFavorite(person.id, personFavorite)
@@ -170,276 +581,166 @@ fun PersonScreen(
                                     onChanged()
                                 }
                             )
+                        }
+                        DropdownMenuItem(
+                            text = { Text(if (person.isSelf) "Rename yourself" else "Rename", fontFamily = GeneFontFamily) },
+                            leadingIcon = { Icon(Icons.Outlined.Edit, null, tint = colors.textSecondary) },
+                            colors = itemColors,
+                            onClick = { personaMenuOpen = false; renameOpen = true }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Calendar", fontFamily = GeneFontFamily) },
+                            leadingIcon = { Icon(Icons.Outlined.Event, null, tint = colors.textSecondary) },
+                            colors = itemColors,
+                            onClick = { personaMenuOpen = false; onCalendar() }
+                        )
+                        if (!person.isSelf) {
                             DropdownMenuItem(
-                                text = { Text("Rename") },
-                                leadingIcon = { Icon(Icons.Outlined.Edit, null) },
-                                onClick = { personaMenuOpen = false; renameOpen = true }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Delete") },
-                                leadingIcon = { Icon(Icons.Outlined.DeleteOutline, null) },
+                                text = { Text("Delete", fontFamily = GeneFontFamily) },
+                                leadingIcon = { Icon(Icons.Outlined.DeleteOutline, null, tint = colors.danger) },
+                                colors = itemColors,
                                 onClick = { personaMenuOpen = false; showDelete = true }
                             )
                         }
                     }
                 }
-            )
+            }
         }
-    ) { padding ->
-        Box(Modifier.fillMaxSize()) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = padding.calculateTopPadding())
-                    .padding(horizontal = 22.dp),
-                contentPadding = PaddingValues(bottom = 120.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Apple Contact Profile Hero (Large Memoji + Name)
-                item {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        if (!person.avatar.isNullOrBlank()) {
-                            MemojiAvatar(
-                                config = MemojiConfig.deserialize(person.avatar),
-                                size = 84.dp
-                            )
-                        } else {
-                            Box(
-                                modifier = Modifier
-                                    .size(84.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0xFF8E8E93)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = person.name.take(1).uppercase(),
-                                    color = Color.White,
-                                    fontSize = 36.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(10.dp))
-                        Text(
-                            text = person.name,
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                    }
-                }
 
-                item {
-                    Spacer(Modifier.height(8.dp))
-                    if (memories.size >= 10) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.surface,
-                            shape = RoundedCornerShape(14.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                    Text("Summary", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                                    IconButton(onClick = { regenerateSummary() }, enabled = !summaryRefreshing) {
-                                        Icon(Icons.Outlined.Refresh, "Regenerate summary")
-                                    }
-                                }
-                                Text(displayedSummary ?: "Building a clearer picture…", color = GeneGray, style = MaterialTheme.typography.bodyLarge)
-                            }
-                        }
-                    } else {
-                        Text("Add ${10 - memories.size} more memor${if (10 - memories.size == 1) "y" else "ies"} for a generated summary.", style = MaterialTheme.typography.bodyLarge, color = GeneGray)
-                    }
-                    Spacer(Modifier.height(18.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        persona.traits.forEach { trait ->
-                            Surface(
-                                color = MaterialTheme.colorScheme.surface,
-                                shape = RoundedCornerShape(50),
-                                modifier = Modifier.padding(end = 2.dp)
-                            ) {
-                                Text(trait, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), style = MaterialTheme.typography.bodyMedium)
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(24.dp))
-                    Text("Quick actions", style = MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.height(10.dp))
-                    QuickActionsGrid(
-                        onCalendar = onCalendar,
-                        onChat = { onOpenChat(null, CHAT_TALK) },
-                        onAsk = onAsk,
-                        onSearch = onSearch,
-                        onRemember = { capture = true }
-                    )
-                    if (quoteSet.isNotEmpty()) {
-                        Spacer(Modifier.height(24.dp))
-                        Text("Quotes", style = MaterialTheme.typography.titleMedium)
-                        Spacer(Modifier.height(10.dp))
-                        QuoteCarousel(quoteSet, quoteIndex)
-                    }
-                    Spacer(Modifier.height(24.dp))
-                    if (sessions.isNotEmpty()) {
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Text("Chats", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                            Row(Modifier.clickable(onClick = onAllChats).padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("See all", color = GeneGray, style = MaterialTheme.typography.bodyMedium)
-                                Icon(Icons.Outlined.ChevronRight, "See all chats", tint = GeneGray, modifier = Modifier.size(20.dp))
-                            }
-                        }
-                        Spacer(Modifier.height(10.dp))
-                    }
-                }
-                if (sessions.isNotEmpty()) {
-                    item {
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 8.dp)) {
-                            items(sessions.take(5), key = { "preview-${it.id}" }) { session ->
-                                ChatPreviewCard(session, onClick = { onOpenChat(session.id, CHAT_TALK) })
-                            }
-                            if (sessions.size > 5) {
-                                item { ChatPreviewMoreCard(onClick = onAllChats) }
-                            }
-                        }
-                    }
-                }
-                item {
-                    Spacer(Modifier.height(6.dp))
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text("Memories", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                        if (memories.size > 10) TextButton(onClick = onAllMemories) { Text("Show all") }
-                        IconButton(onClick = {
-                            memoryGrid = !memoryGrid
-                            prefs.edit().putBoolean(memoryLayoutKey, memoryGrid).apply()
-                        }) {
-                            Icon(if (memoryGrid) Icons.Outlined.ViewList else Icons.Outlined.ViewModule, if (memoryGrid) "List view" else "Grid view")
-                        }
-                    }
-                    Spacer(Modifier.height(4.dp))
-                }
-                if (memories.isEmpty()) item { Text("Your notes will appear here.", color = GeneGray, style = MaterialTheme.typography.bodyLarge) }
-                if (memoryGrid) {
-                    item { MasonryMemoryGallery(memories.take(10), onMemory) }
-                } else {
-                    items(memories.take(10), key = { it.id }) { memory -> MemoryCard(memory, onClick = { onMemory(memory.id) }) }
-                }
-            }
-            Box(
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .height(140.dp)
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.45f))
-                        )
-                    )
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .imePadding()
+                .padding(bottom = GeneSpace.xs)
+        ) {
+            MemoryComposer(
+                person = person,
+                db = db,
+                onSaved = onChanged,
+                hazeState = hazeState,
+                expandTypes = openCapture
             )
-            Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().imePadding()) {
-                MemoryComposer(person, db, onSaved = onChanged, onStartChat = { onOpenChat(null, CHAT_TALK) })
-            }
         }
     }
-    if (capture) CaptureSheet(person, db, onDismiss = { capture = false }, onSaved = { capture = false; onChanged() })
+
     if (renameOpen) {
-        ModalBottomSheet(onDismissRequest = { renameOpen = false }, containerColor = MaterialTheme.colorScheme.background) {
-            Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 22.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(15.dp)) {
-                Text("Rename person", style = MaterialTheme.typography.titleLarge)
-                OutlinedTextField(value = renameText, onValueChange = { renameText = it }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                Button(
-                    onClick = {
-                        if (renameText.isNotBlank()) {
-                            db.updatePersonName(person.id, renameText)
-                            renameOpen = false
-                            onChanged()
-                        }
-                    },
-                    enabled = renameText.isNotBlank(),
-                    modifier = Modifier.fillMaxWidth()
+        ModalBottomSheet(
+            onDismissRequest = { renameOpen = false },
+            containerColor = colors.bg,
+            shape = SheetShape
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = GeneSpace.lg)
+                    .padding(bottom = GeneSpace.xl),
+                verticalArrangement = Arrangement.spacedBy(GeneSpace.md)
+            ) {
+                Text(
+                    if (person.isSelf) "Your name" else "Rename person",
+                    color = colors.textPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = GeneFontFamily
+                )
+                OutlinedTextField(
+                    value = renameText,
+                    onValueChange = { renameText = it },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(FieldShape),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = colors.border,
+                        unfocusedBorderColor = colors.border,
+                        focusedTextColor = colors.textPrimary,
+                        unfocusedTextColor = colors.textPrimary,
+                        cursorColor = colors.accent,
+                        focusedContainerColor = colors.surface,
+                        unfocusedContainerColor = colors.surface
+                    )
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                        .clip(ButtonShape)
+                        .background(if (renameText.isNotBlank()) colors.pillActive else colors.pill)
+                        .clickable(enabled = renameText.isNotBlank()) {
+                            if (renameText.isNotBlank()) {
+                                db.updatePersonName(person.id, renameText)
+                                renameOpen = false
+                                onChanged()
+                            }
+                        },
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text("Save name")
+                    Text(
+                        "Save name",
+                        color = if (renameText.isNotBlank()) colors.onPillActive else colors.textTertiary,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = GeneFontFamily
+                    )
                 }
             }
         }
     }
-    if (showDelete) DeletePersonSheet(person, db, onDismiss = { showDelete = false }, onDeleted = { showDelete = false; onBack() })
-}
-
-@Composable
-fun QuickActionsGrid(
-    onCalendar: () -> Unit,
-    onChat: () -> Unit,
-    onAsk: () -> Unit,
-    onSearch: () -> Unit,
-    onRemember: () -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            ActionBento(Icons.Outlined.Event, "Calendar", onCalendar, Modifier.weight(1f))
-            ActionBento(Icons.Outlined.SmartToy, "Chat with", onChat, Modifier.weight(1f))
-            ActionBento(Icons.Outlined.HelpOutline, "Ask about", onAsk, Modifier.weight(1f))
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            ActionBento(Icons.Outlined.Search, "Search", onSearch, Modifier.weight(1f))
-            ActionBento(Icons.Outlined.Lightbulb, "Remember", onRemember, Modifier.weight(1f))
-        }
+    if (showDelete) {
+        DeletePersonSheet(
+            person = person,
+            db = db,
+            onDismiss = { showDelete = false },
+            onDeleted = { showDelete = false; onBack() },
+            colors = colors
+        )
     }
 }
 
 @Composable
-fun ActionBento(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    title: String,
-    onClick: () -> Unit,
-    modifier: Modifier
+fun QuoteCarousel(
+    quotes: List<Interaction>,
+    index: Int,
+    colors: GeneColors = rememberGeneColors(false)
 ) {
-    Surface(
-        onClick = onClick,
-        modifier = modifier.height(72.dp),
-        color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(14.dp)
-    ) {
-        Column(
-            Modifier.fillMaxSize().padding(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Icon(icon, title, tint = IosBlue, modifier = Modifier.size(24.dp))
-            Spacer(Modifier.height(5.dp))
-            Text(
-                title,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = IosBlue,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
-@Composable
-fun QuoteCarousel(quotes: List<Interaction>, index: Int) {
     val quote = quotes[index.coerceIn(0, quotes.lastIndex)]
-    Box(Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
-        Column(
-            Modifier.fillMaxWidth().padding(horizontal = 22.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                "“${quote.body.removePrefix("Quote · ").trim().trim('"')}”",
-                style = MaterialTheme.typography.titleMedium.copy(fontStyle = FontStyle.Italic),
-                textAlign = TextAlign.Center,
-                maxLines = 4,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text("${index + 1} / ${quotes.size}  ·  ${quote.createdAt.asDate()}", color = GeneGray, style = MaterialTheme.typography.bodyMedium)
-        }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(CardShape)
+            .background(colors.pastel(quote.id.toInt()).copy(alpha = if (colors.dark) 0.55f else 0.95f))
+            .border(0.5.dp, colors.border.copy(alpha = 0.55f), CardShape)
+            .padding(GeneSpace.md),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(GeneSpace.sm)
+    ) {
+        Icon(
+            Icons.Outlined.FormatQuote,
+            contentDescription = null,
+            tint = colors.textTertiary,
+            modifier = Modifier.size(20.dp)
+        )
+        Text(
+            text = "“${quote.body.removePrefix("Quote · ").trim().trim('"')}”",
+            color = colors.textPrimary,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium,
+            fontStyle = FontStyle.Italic,
+            fontFamily = GeneFontFamily,
+            textAlign = TextAlign.Center,
+            maxLines = 4,
+            overflow = TextOverflow.Ellipsis,
+            lineHeight = 22.sp
+        )
+        Text(
+            text = "${index + 1} / ${quotes.size}  ·  ${quote.createdAt.asDate()}",
+            color = colors.textTertiary,
+            fontSize = 12.sp,
+            fontFamily = GeneFontFamily
+        )
     }
 }
 
@@ -449,24 +750,72 @@ fun DeletePersonSheet(
     person: Person,
     db: GeneDatabase,
     onDismiss: () -> Unit,
-    onDeleted: () -> Unit
+    onDeleted: () -> Unit,
+    colors: GeneColors = rememberGeneColors(false)
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.background) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = colors.bg,
+        shape = SheetShape
+    ) {
         Column(
             Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(horizontal = 22.dp)
-                .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(15.dp)
+                .padding(horizontal = GeneSpace.lg)
+                .padding(bottom = GeneSpace.xl),
+            verticalArrangement = Arrangement.spacedBy(GeneSpace.md)
         ) {
-            Text("Remove ${person.name}?", style = MaterialTheme.typography.titleLarge)
-            Text("This removes the person and every saved memory from this device. This cannot be undone.", color = GeneGray, style = MaterialTheme.typography.bodyLarge)
-            Button(onClick = { db.deletePerson(person.id); onDeleted() }, modifier = Modifier.fillMaxWidth()) {
-                Text("Remove person")
+            Text(
+                "Remove ${person.name}?",
+                color = colors.textPrimary,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold,
+                fontFamily = GeneFontFamily
+            )
+            Text(
+                "This removes the person and every saved memory from this device. This cannot be undone.",
+                color = colors.textSecondary,
+                fontSize = 14.sp,
+                fontFamily = GeneFontFamily,
+                lineHeight = 20.sp
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp)
+                    .clip(ButtonShape)
+                    .background(colors.danger)
+                    .clickable {
+                        db.deletePerson(person.id)
+                        onDeleted()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "Remove person",
+                    color = Color.White,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = GeneFontFamily
+                )
             }
-            OutlinedButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-                Text("Keep person")
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp)
+                    .clip(ButtonShape)
+                    .border(0.5.dp, colors.border, ButtonShape)
+                    .clickable(onClick = onDismiss),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "Keep person",
+                    color = colors.textPrimary,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium,
+                    fontFamily = GeneFontFamily
+                )
             }
         }
     }
