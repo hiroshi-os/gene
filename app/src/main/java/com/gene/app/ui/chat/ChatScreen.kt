@@ -6,6 +6,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,9 +21,10 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
@@ -29,25 +32,22 @@ import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.KeyboardVoice
-import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Send
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Button
-import androidx.compose.material3.Divider
-import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -57,8 +57,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.gene.app.data.ChatMessage
 import com.gene.app.data.ChatSession
@@ -69,8 +75,19 @@ import com.gene.app.data.Person
 import com.gene.app.data.ROLE_ASSISTANT
 import com.gene.app.data.ROLE_USER
 import com.gene.app.data.RemoteInsightEngine
+import com.gene.app.ui.common.GeneBarAction
+import com.gene.app.ui.common.GeneGlassDropdownMenu
+import com.gene.app.ui.common.GeneGlassIconButton
+import com.gene.app.ui.common.GeneGlassInputBar
+import com.gene.app.ui.common.geneGlassMenuItemColors
+import com.gene.app.ui.common.geneHazeSource
+import com.gene.app.ui.common.rememberGeneHazeState
 import com.gene.app.ui.navigation.CHAT_ASK
-import com.gene.app.ui.theme.GeneGray
+import com.gene.app.ui.theme.GeneColors
+import com.gene.app.ui.theme.GeneFontFamily
+import com.gene.app.ui.theme.GeneRadius
+import com.gene.app.ui.theme.GeneSpace
+import com.gene.app.ui.theme.rememberGeneColors
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -83,6 +100,10 @@ fun ChatScreen(
     context: Context,
     onBack: () -> Unit
 ) {
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val colors = rememberGeneColors(dark)
+    val hazeState = rememberGeneHazeState()
+
     var temporary by remember(session?.id) { mutableStateOf(false) }
     var savedSessionId by remember(session?.id) { mutableStateOf(session?.id) }
     var sessionTitle by remember(session?.id) { mutableStateOf(session?.title ?: "New conversation") }
@@ -169,101 +190,268 @@ fun ChatScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                        Text(if (mode == CHAT_ASK) "Ask about ${person.name}" else "Talk with ${person.name}", style = MaterialTheme.typography.titleMedium)
-                        Text(if (temporary) "Temporary chat" else sessionTitle, color = GeneGray, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, "Back to person") } },
-                actions = {
-                    if (savedSessionId == null) {
-                        IconButton(onClick = {
-                            temporary = !temporary
-                            sessionTitle = if (temporary) "Temporary chat" else "New conversation"
-                        }) {
-                            Icon(if (temporary) Icons.Outlined.VisibilityOff else Icons.Outlined.BookmarkBorder, if (temporary) "Temporary chat enabled" else "Make temporary")
-                        }
-                    } else {
-                        Box {
-                            IconButton(onClick = { menuOpen = true }) { Icon(Icons.Outlined.MoreVert, "Session actions") }
-                            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                                DropdownMenuItem(text = { Text(if (favorite) "Unfavorite" else "Favorite") }, leadingIcon = { Icon(if (favorite) Icons.Outlined.Star else Icons.Outlined.StarBorder, null) }, onClick = { favorite = !favorite; db.setSessionFavorite(savedSessionId!!, favorite); menuOpen = false })
-                                DropdownMenuItem(text = { Text("Rename") }, leadingIcon = { Icon(Icons.Outlined.Edit, null) }, onClick = { menuOpen = false; renameOpen = true })
-                                DropdownMenuItem(text = { Text("Delete") }, leadingIcon = { Icon(Icons.Outlined.DeleteOutline, null) }, onClick = { db.deleteSession(savedSessionId!!); menuOpen = false; onBack() })
-                            }
-                        }
-                    }
-                }
-            )
-        },
-        bottomBar = {
-            Surface(Modifier.fillMaxWidth().imePadding(), color = MaterialTheme.colorScheme.background) {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.Bottom,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    IconButton(onClick = { startVoice() }, enabled = !sending, modifier = Modifier.size(52.dp)) {
-                        Icon(Icons.Outlined.KeyboardVoice, if (listening) "Listening" else "Voice input")
-                    }
-                    OutlinedTextField(
-                        value = draft,
-                        onValueChange = { draft = it },
-                        placeholder = { Text("Say something") },
-                        minLines = 1,
-                        maxLines = 5,
-                        modifier = Modifier.weight(1f)
-                    )
-                    IconButton(onClick = { send() }, enabled = draft.isNotBlank() && !sending, modifier = Modifier.size(52.dp)) {
-                        Icon(Icons.Outlined.Send, "Send")
-                    }
-                }
-            }
-        }
-    ) { padding ->
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.bg)
+    ) {
         LazyColumn(
             Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .geneHazeSource(hazeState)
+                .statusBarsPadding()
+                .padding(top = 56.dp)
+                .padding(bottom = 96.dp)
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             item {
-                if (messages.isEmpty()) ChatWelcome(person.name, mode, temporary)
-                if (sending) Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.Start) { Text("Thinking…", color = GeneGray, style = MaterialTheme.typography.bodyMedium) }
                 Spacer(Modifier.height(12.dp))
-            }
-            items(messages, key = { it.id }) { message ->
-                ChatBubble(message, memoryMap, expandedMessageId == message.id) {
-                    expandedMessageId = if (expandedMessageId == message.id) null else message.id
+                if (messages.isEmpty()) ChatWelcome(person.name, mode, temporary, colors)
+                if (sending) {
+                    Text(
+                        "Thinking…",
+                        color = colors.textTertiary,
+                        fontSize = 14.sp,
+                        fontFamily = GeneFontFamily,
+                        modifier = Modifier.padding(vertical = 10.dp)
+                    )
                 }
             }
-            item { Spacer(Modifier.height(14.dp)) }
+            items(messages, key = { it.id }) { message ->
+                ChatBubble(
+                    message = message,
+                    memoryMap = memoryMap,
+                    expanded = expandedMessageId == message.id,
+                    colors = colors,
+                    onToggleReferences = {
+                        expandedMessageId = if (expandedMessageId == message.id) null else message.id
+                    }
+                )
+            }
+            item { Spacer(Modifier.height(20.dp)) }
         }
+
+        // Glass top bar — no opaque scrim (lets Haze blur read through)
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(horizontal = GeneSpace.sm, vertical = 6.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                GeneGlassIconButton(
+                    colors = colors,
+                    hazeState = hazeState,
+                    onClick = onBack,
+                    contentDescription = "Back to person"
+                ) {
+                    Icon(Icons.Outlined.ArrowBack, null, tint = colors.textPrimary, modifier = Modifier.size(18.dp))
+                }
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(1.dp)
+                ) {
+                    Text(
+                        if (mode == CHAT_ASK) "Ask about ${person.name}" else "Talk with ${person.name}",
+                        color = colors.textPrimary,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = GeneFontFamily,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        if (temporary) "Temporary chat" else sessionTitle,
+                        color = colors.textSecondary,
+                        fontSize = 12.sp,
+                        fontFamily = GeneFontFamily,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (savedSessionId == null) {
+                    GeneGlassIconButton(
+                        colors = colors,
+                        hazeState = hazeState,
+                        onClick = {
+                            temporary = !temporary
+                            sessionTitle = if (temporary) "Temporary chat" else "New conversation"
+                        },
+                        contentDescription = if (temporary) "Temporary chat enabled" else "Make temporary"
+                    ) {
+                        Icon(
+                            if (temporary) Icons.Outlined.VisibilityOff else Icons.Outlined.BookmarkBorder,
+                            null,
+                            tint = if (temporary) colors.accent else colors.textPrimary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                } else {
+                    Box {
+                        GeneGlassIconButton(
+                            colors = colors,
+                            hazeState = hazeState,
+                            onClick = { menuOpen = true },
+                            contentDescription = "Session actions"
+                        ) {
+                            Icon(Icons.Outlined.MoreHoriz, null, tint = colors.textPrimary, modifier = Modifier.size(18.dp))
+                        }
+                        GeneGlassDropdownMenu(
+                            expanded = menuOpen,
+                            onDismissRequest = { menuOpen = false },
+                            colors = colors,
+                            hazeState = hazeState
+                        ) {
+                            val itemColors = geneGlassMenuItemColors(colors)
+                            DropdownMenuItem(
+                                text = { Text(if (favorite) "Unfavorite" else "Favorite") },
+                                leadingIcon = { Icon(if (favorite) Icons.Outlined.Star else Icons.Outlined.StarBorder, null) },
+                                colors = itemColors,
+                                onClick = { favorite = !favorite; db.setSessionFavorite(savedSessionId!!, favorite); menuOpen = false }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Rename") },
+                                leadingIcon = { Icon(Icons.Outlined.Edit, null) },
+                                colors = itemColors,
+                                onClick = { menuOpen = false; renameOpen = true }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Delete") },
+                                leadingIcon = { Icon(Icons.Outlined.DeleteOutline, null) },
+                                colors = itemColors,
+                                onClick = { db.deleteSession(savedSessionId!!); menuOpen = false; onBack() }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Composer — liquid glass; no solid scrim so blur reads through message list
+        GeneGlassInputBar(
+            colors = colors,
+            hazeState = hazeState,
+            value = draft,
+            onValueChange = { draft = it },
+            placeholder = "Say something",
+            enabled = !sending,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .imePadding()
+                .navigationBarsPadding()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            leading = {
+                GeneBarAction(
+                    onClick = { startVoice() },
+                    enabled = !sending,
+                    muted = !listening,
+                    colors = colors,
+                    contentDescription = if (listening) "Listening" else "Voice input"
+                ) {
+                    Icon(
+                        Icons.Outlined.KeyboardVoice,
+                        contentDescription = null,
+                        tint = if (listening) colors.accent else colors.textSecondary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            },
+            trailing = {
+                val canSend = draft.isNotBlank() && !sending
+                GeneBarAction(
+                    onClick = { send() },
+                    enabled = canSend,
+                    filled = true,
+                    colors = colors,
+                    contentDescription = "Send"
+                ) {
+                    Icon(
+                        Icons.Outlined.Send,
+                        contentDescription = null,
+                        tint = if (canSend) colors.onPillActive else colors.textTertiary,
+                        modifier = Modifier.size(17.dp)
+                    )
+                }
+            }
+        )
     }
+
     if (renameOpen) {
-        ModalBottomSheet(onDismissRequest = { renameOpen = false }, containerColor = MaterialTheme.colorScheme.background) {
-            Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 22.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(15.dp)) {
-                Text("Rename chat", style = MaterialTheme.typography.titleLarge)
-                OutlinedTextField(value = renameText, onValueChange = { renameText = it }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                Button(onClick = { if (renameText.isNotBlank()) { db.updateSessionTitle(savedSessionId!!, renameText); sessionTitle = renameText.take(60); renameOpen = false } }, enabled = renameText.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text("Save name") }
+        ModalBottomSheet(
+            onDismissRequest = { renameOpen = false },
+            containerColor = colors.surface
+        ) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 22.dp)
+                    .padding(bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Text("Rename chat", color = colors.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeneFontFamily)
+                SoftPillField(
+                    value = renameText,
+                    onValueChange = { renameText = it },
+                    colors = colors,
+                    singleLine = true
+                )
+                Button(
+                    onClick = {
+                        if (renameText.isNotBlank()) {
+                            db.updateSessionTitle(savedSessionId!!, renameText)
+                            sessionTitle = renameText.take(60)
+                            renameOpen = false
+                        }
+                    },
+                    enabled = renameText.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = colors.accent, contentColor = colors.onPillActive),
+                    shape = RoundedCornerShape(GeneRadius.sm)
+                ) {
+                    Text("Save name")
+                }
             }
         }
     }
 }
 
 @Composable
-fun ChatWelcome(name: String, mode: String, temporary: Boolean) {
-    Column(Modifier.fillMaxWidth().padding(top = 26.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(if (mode == CHAT_ASK) "Ask about $name" else "Talk with $name", style = MaterialTheme.typography.titleLarge)
-        Text(if (mode == CHAT_ASK) "Ask for a read on patterns, choices, or what may happen next." else if (temporary) "This chat disappears when you leave. Say whatever is on your mind." else "This conversation is saved with the person. Speak naturally and keep the thread.", color = GeneGray, style = MaterialTheme.typography.bodyLarge)
+fun ChatWelcome(name: String, mode: String, temporary: Boolean, colors: GeneColors = rememberGeneColors(MaterialTheme.colorScheme.background.luminance() < 0.5f)) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = 20.dp, bottom = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            if (mode == CHAT_ASK) "Ask about $name" else "Talk with $name",
+            color = colors.textPrimary,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.SemiBold,
+            fontFamily = GeneFontFamily
+        )
+        Text(
+            if (mode == CHAT_ASK) {
+                "Ask for a read on patterns, choices, or what may happen next."
+            } else if (temporary) {
+                "This chat disappears when you leave. Say whatever is on your mind."
+            } else {
+                "This conversation is saved with the person. Speak naturally and keep the thread."
+            },
+            color = colors.textSecondary,
+            fontSize = 15.sp,
+            lineHeight = 22.sp,
+            fontFamily = GeneFontFamily
+        )
     }
 }
 
@@ -272,34 +460,88 @@ fun ChatBubble(
     message: ChatMessage,
     memoryMap: Map<Long, Interaction>,
     expanded: Boolean,
-    onToggleReferences: () -> Unit
+    onToggleReferences: () -> Unit,
+    colors: GeneColors = rememberGeneColors(MaterialTheme.colorScheme.background.luminance() < 0.5f)
 ) {
     val isUser = message.role == ROLE_USER
-    Column(Modifier.fillMaxWidth(), horizontalAlignment = if (isUser) Alignment.End else Alignment.Start) {
-        Surface(
-            color = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-            contentColor = if (isUser) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-            shape = RoundedCornerShape(18.dp),
-            border = if (isUser) null else androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-            modifier = Modifier.widthIn(max = 340.dp)
-        ) {
-            Column(Modifier.padding(horizontal = 17.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(message.body, style = MaterialTheme.typography.bodyLarge)
-                if (!isUser && message.confidence != null) {
-                    Text(
-                        "${confidenceLabel(message.confidence)} · ${message.confidence}% · ${if (message.referenceIds.isEmpty()) "No references" else "References"}",
-                        color = if (isUser) MaterialTheme.colorScheme.onPrimary else GeneGray,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.clickable(onClick = onToggleReferences)
-                    )
-                    if (expanded) {
-                        Divider()
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        horizontalAlignment = Alignment.Start
+    ) {
+        if (isUser) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(GeneRadius.md))
+                    .background(colors.pill)
+                    .padding(horizontal = 14.dp, vertical = 12.dp)
+            ) {
+                Text(
+                    message.body,
+                    color = colors.textPrimary,
+                    fontSize = 15.sp,
+                    lineHeight = 22.sp,
+                    fontFamily = GeneFontFamily
+                )
+            }
+        } else {
+            HorizontalDivider(
+                color = colors.divider.copy(alpha = 0.7f),
+                thickness = 0.5.dp,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+            Text(
+                message.body,
+                color = colors.textPrimary,
+                fontSize = 15.sp,
+                lineHeight = 23.sp,
+                fontFamily = GeneFontFamily
+            )
+            if (message.confidence != null) {
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    "${confidenceLabel(message.confidence)} · ${message.confidence}% · ${if (message.referenceIds.isEmpty()) "No references" else "References"}",
+                    color = colors.accent,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    fontFamily = GeneFontFamily,
+                    modifier = Modifier.clickable(onClick = onToggleReferences)
+                )
+                if (expanded) {
+                    Spacer(Modifier.height(10.dp))
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(GeneRadius.sm))
+                            .background(colors.pill)
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
                         if (message.referenceIds.isEmpty()) {
-                            Text("No saved memory was used for this reply.", color = GeneGray, style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                "No saved memory was used for this reply.",
+                                color = colors.textSecondary,
+                                fontSize = 13.sp,
+                                fontFamily = GeneFontFamily
+                            )
                         } else {
-                            Text("References used", style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                "References used",
+                                color = colors.textPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                fontFamily = GeneFontFamily
+                            )
                             message.referenceIds.mapNotNull { memoryMap[it] }.forEach { memory ->
-                                Text("· ${memory.body.take(180)}", color = GeneGray, style = MaterialTheme.typography.bodyMedium)
+                                Text(
+                                    "· ${memory.body.take(180)}",
+                                    color = colors.textSecondary,
+                                    fontSize = 13.sp,
+                                    lineHeight = 18.sp,
+                                    fontFamily = GeneFontFamily
+                                )
                             }
                         }
                     }
@@ -307,6 +549,37 @@ fun ChatBubble(
             }
         }
     }
+}
+
+@Composable
+private fun SoftPillField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    colors: GeneColors,
+    singleLine: Boolean = false,
+    label: String? = null,
+    visualTransformation: androidx.compose.ui.text.input.VisualTransformation = androidx.compose.ui.text.input.VisualTransformation.None
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = label?.let { { Text(it, color = colors.textSecondary) } },
+        singleLine = singleLine,
+        visualTransformation = visualTransformation,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(GeneRadius.sm),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = Color.Transparent,
+            unfocusedBorderColor = Color.Transparent,
+            focusedContainerColor = colors.pill,
+            unfocusedContainerColor = colors.pill,
+            focusedTextColor = colors.textPrimary,
+            unfocusedTextColor = colors.textPrimary,
+            cursorColor = colors.accent,
+            focusedLabelColor = colors.textSecondary,
+            unfocusedLabelColor = colors.textTertiary
+        )
+    )
 }
 
 fun confidenceLabel(value: Int): String = when {

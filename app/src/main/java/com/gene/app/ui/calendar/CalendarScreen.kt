@@ -14,22 +14,21 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.ChevronLeft
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,12 +36,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.gene.app.data.GeneDatabase
 import com.gene.app.data.Person
+import com.gene.app.ui.common.GeneGlassIconButton
+import com.gene.app.ui.common.geneHazeSource
+import com.gene.app.ui.common.rememberGeneHazeState
 import com.gene.app.ui.memory.MemoryCard
-import com.gene.app.ui.theme.GeneGray
+import com.gene.app.ui.theme.GeneFontFamily
+import com.gene.app.ui.theme.GeneRadius
+import com.gene.app.ui.theme.GeneSpace
+import com.gene.app.ui.theme.rememberGeneColors
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -56,6 +66,10 @@ fun CalendarScreen(
     onBack: () -> Unit,
     onOpenMemory: (Long) -> Unit
 ) {
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val colors = rememberGeneColors(dark)
+    val hazeState = rememberGeneHazeState()
+
     var monthCursor by remember {
         mutableStateOf(Calendar.getInstance().apply {
             set(Calendar.DAY_OF_MONTH, 1)
@@ -66,68 +80,159 @@ fun CalendarScreen(
         })
     }
     var selectedDay by remember { mutableStateOf<String?>(null) }
-    val memories = remember(person.id) { db.interactions(person.id) }
-    val dayFormat = remember { SimpleDateFormat("yyyy-MM-dd", Locale.US) }
+    val memories = db.interactions(person.id)
+    val dayFormat = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
     val titleFormat = remember { SimpleDateFormat("MMMM yyyy", Locale.getDefault()) }
     val dayLabelFormat = remember { SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()) }
     val byDay = remember(memories) { memories.groupBy { dayFormat.format(Date(it.createdAt)) } }
-    val firstDay = remember(monthCursor.timeInMillis) { monthCursor.clone() as Calendar }
-    val offset = (firstDay.get(Calendar.DAY_OF_WEEK) - Calendar.SUNDAY)
-    val daysInMonth = firstDay.getActualMaximum(Calendar.DAY_OF_MONTH)
-    val cells = (0 until 42).map { index ->
-        val day = index - offset + 1
-        if (day in 1..daysInMonth) day else null
+
+    val daysInMonth = monthCursor.getActualMaximum(Calendar.DAY_OF_MONTH)
+    val firstDayOfWeek = monthCursor.get(Calendar.DAY_OF_WEEK)
+    val leadingBlanks = firstDayOfWeek - 1
+    val cells = buildList {
+        repeat(leadingBlanks) { add(null) }
+        for (day in 1..daysInMonth) add(day)
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Calendar · ${person.name}", style = MaterialTheme.typography.titleMedium) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, "Back") } }
-            )
-        }
-    ) { padding ->
+    val todayKey = remember { dayFormat.format(Date()) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.bg)
+    ) {
         Column(
             Modifier
                 .fillMaxSize()
-                .padding(padding)
+                .geneHazeSource(hazeState)
+                .statusBarsPadding()
+                .padding(top = 56.dp)
                 .padding(horizontal = 18.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Spacer(Modifier.height(10.dp))
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { monthCursor = (monthCursor.clone() as Calendar).apply { add(Calendar.MONTH, -1) } }) {
-                    Icon(Icons.Outlined.ChevronLeft, "Previous month")
+            Column {
+                Text(
+                    "Calendar",
+                    color = colors.textPrimary,
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = GeneFontFamily
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    person.name,
+                    color = colors.textSecondary,
+                    fontSize = 14.sp,
+                    fontFamily = GeneFontFamily
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(GeneRadius.md))
+                    .background(colors.surface)
+                    .padding(horizontal = 4.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(GeneRadius.xs))
+                        .clickable {
+                            monthCursor = (monthCursor.clone() as Calendar).apply { add(Calendar.MONTH, -1) }
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Outlined.ChevronLeft, "Previous month", tint = colors.textSecondary, modifier = Modifier.size(20.dp))
                 }
-                Text(titleFormat.format(monthCursor.time), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-                IconButton(onClick = { monthCursor = (monthCursor.clone() as Calendar).apply { add(Calendar.MONTH, 1) } }) {
-                    Icon(Icons.Outlined.ChevronRight, "Next month")
+                Text(
+                    titleFormat.format(monthCursor.time),
+                    color = colors.textPrimary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = GeneFontFamily,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center
+                )
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(GeneRadius.xs))
+                        .clickable {
+                            monthCursor = (monthCursor.clone() as Calendar).apply { add(Calendar.MONTH, 1) }
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Outlined.ChevronRight, "Next month", tint = colors.textSecondary, modifier = Modifier.size(20.dp))
                 }
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                listOf("S", "M", "T", "W", "T", "F", "S").forEach {
-                    Text(it, color = GeneGray, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.width(40.dp), textAlign = TextAlign.Center)
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(GeneRadius.lg))
+                    .background(colors.surface)
+                    .padding(horizontal = 10.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    listOf("S", "M", "T", "W", "T", "F", "S").forEach {
+                        Text(
+                            it,
+                            color = colors.textTertiary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            fontFamily = GeneFontFamily,
+                            modifier = Modifier.width(40.dp),
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 cells.chunked(7).forEach { week ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         week.forEach { day ->
-                            val date = if (day == null) null else (monthCursor.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, day) }
+                            val date = if (day == null) null else (monthCursor.clone() as Calendar).apply {
+                                set(Calendar.DAY_OF_MONTH, day)
+                            }
                             val key = date?.let { dayFormat.format(it.time) }
                             val count = key?.let { byDay[it]?.size ?: 0 } ?: 0
+                            val isToday = key == todayKey
+                            val hasMemories = count > 0
+
                             Box(
                                 modifier = Modifier
                                     .width(40.dp)
-                                    .height(58.dp)
-                                    .clickable(enabled = day != null && count > 0) { selectedDay = key },
+                                    .height(52.dp)
+                                    .clip(RoundedCornerShape(GeneRadius.xs))
+                                    .background(if (isToday) colors.pill else Color.Transparent)
+                                    .clickable(enabled = day != null && hasMemories) { selectedDay = key },
                                 contentAlignment = Alignment.TopCenter
                             ) {
                                 if (day != null) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        Text(day.toString(), style = MaterialTheme.typography.bodyLarge)
-                                        if (count > 0) Box(Modifier.size(8.dp).background(MaterialTheme.colorScheme.primary, CircleShape))
-                                        if (count > 0) Text(count.toString(), color = GeneGray, style = MaterialTheme.typography.bodyMedium)
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(3.dp),
+                                        modifier = Modifier.padding(top = 6.dp)
+                                    ) {
+                                        Text(
+                                            day.toString(),
+                                            color = when {
+                                                isToday -> colors.accent
+                                                hasMemories -> colors.textPrimary
+                                                else -> colors.textSecondary
+                                            },
+                                            fontSize = 14.sp,
+                                            fontWeight = if (isToday || hasMemories) FontWeight.SemiBold else FontWeight.Normal,
+                                            fontFamily = GeneFontFamily
+                                        )
+                                        if (hasMemories) {
+                                            Box(
+                                                Modifier
+                                                    .size(5.dp)
+                                                    .background(colors.accent, CircleShape)
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -135,16 +240,44 @@ fun CalendarScreen(
                     }
                 }
             }
-            if (byDay.isEmpty()) {
-                Text("Saved memories will appear on their days.", color = GeneGray, style = MaterialTheme.typography.bodyLarge)
-            } else {
-                Text("Tap a marked day to see its memories.", color = GeneGray, style = MaterialTheme.typography.bodyMedium)
+
+            Text(
+                if (byDay.isEmpty()) {
+                    "Saved memories will appear on their days."
+                } else {
+                    "Tap a marked day to see its memories."
+                },
+                color = colors.textTertiary,
+                fontSize = 13.sp,
+                fontFamily = GeneFontFamily
+            )
+        }
+
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(horizontal = GeneSpace.sm, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            GeneGlassIconButton(
+                colors = colors,
+                hazeState = hazeState,
+                onClick = onBack,
+                contentDescription = "Back"
+            ) {
+                Icon(Icons.Outlined.ArrowBack, null, tint = colors.textPrimary, modifier = Modifier.size(18.dp))
             }
         }
     }
+
     selectedDay?.let { key ->
         val dayMemories = byDay[key].orEmpty()
-        ModalBottomSheet(onDismissRequest = { selectedDay = null }, containerColor = MaterialTheme.colorScheme.background) {
+        ModalBottomSheet(
+            onDismissRequest = { selectedDay = null },
+            containerColor = colors.surface
+        ) {
             Column(
                 Modifier
                     .fillMaxWidth()
@@ -153,8 +286,17 @@ fun CalendarScreen(
                     .padding(bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(dayMemories.firstOrNull()?.let { dayLabelFormat.format(Date(it.createdAt)) } ?: "Memories", style = MaterialTheme.typography.titleLarge)
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.heightIn(max = 430.dp)) {
+                Text(
+                    dayMemories.firstOrNull()?.let { dayLabelFormat.format(Date(it.createdAt)) } ?: "Memories",
+                    color = colors.textPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = GeneFontFamily
+                )
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.heightIn(max = 430.dp)
+                ) {
                     items(dayMemories, key = { it.id }) { memory ->
                         MemoryCard(memory, onClick = {
                             selectedDay = null

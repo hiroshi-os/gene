@@ -48,11 +48,15 @@ class FloatingCaptureService : Service() {
         bubbleParams = params
         bubble = TextView(this).apply {
             text = "G"
-            textSize = 24f
-            setTextColor(Color.WHITE)
+            textSize = 22f
+            setTextColor(Color.rgb(247, 246, 243)) // Notion light bg
             gravity = Gravity.CENTER
-            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.rgb(8, 8, 8)) }
-            elevation = dp(8).toFloat()
+            // Notion charcoal pill active
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.rgb(55, 53, 47))
+            }
+            elevation = dp(10).toFloat()
             contentDescription = "Gene floating bubble"
             setOnTouchListener(BubbleTouchListener())
         }
@@ -99,11 +103,14 @@ class FloatingCaptureService : Service() {
         }
     }
 
-    private fun openGene() {
+    private fun openGene(openCapture: Boolean = true) {
         val selectedId = prefs.getLong("selected_person_id", -1L)
         val intent = Intent(this, MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            if (selectedId > 0) putExtra("person_id", selectedId)
+            if (selectedId > 0) {
+                putExtra("person_id", selectedId)
+                putExtra("open_capture", openCapture)
+            }
         }
         startActivity(intent)
     }
@@ -115,11 +122,16 @@ class FloatingCaptureService : Service() {
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(14), dp(16), dp(10))
-            background = GradientDrawable().apply { cornerRadius = dp(20).toFloat(); setColor(Color.WHITE); setStroke(dp(1), Color.rgb(205, 205, 200)) }
-            elevation = dp(12).toFloat()
+            // Notion surface + hairline border
+            background = GradientDrawable().apply {
+                cornerRadius = dp(16).toFloat()
+                setColor(Color.rgb(247, 246, 243))
+                setStroke(dp(1), Color.rgb(227, 226, 224))
+            }
+            elevation = dp(14).toFloat()
         }
         addMenuLabel(container, "Gene")
-        addMenuLabel(container, if (selectedId > 0) "Persona · $selectedName" else "Choose a persona")
+        addMenuLabel(container, if (selectedId > 0) "Persona · $selectedName" else "Choose a persona", secondary = true)
         val people = try { GeneDatabase(applicationContext).people() } catch (_: Exception) { emptyList() }
         if (people.isEmpty()) addAction(container, "＋  Add a person") { openGene(); closeMenu() }
         else people.take(5).forEach { person ->
@@ -141,19 +153,35 @@ class FloatingCaptureService : Service() {
         try { windowManager?.addView(container, p) } catch (_: Exception) { menu = null }
     }
 
-    private fun addMenuLabel(parent: LinearLayout, text: String) {
-        parent.addView(TextView(this).apply { this.text = text; textSize = 16f; setTextColor(Color.rgb(30, 30, 30)); setPadding(0, dp(4), 0, dp(4)) })
+    private fun addMenuLabel(parent: LinearLayout, text: String, secondary: Boolean = false) {
+        parent.addView(TextView(this).apply {
+            this.text = text
+            textSize = if (secondary) 13f else 15f
+            setTextColor(if (secondary) Color.rgb(120, 119, 116) else Color.rgb(55, 53, 47))
+            setPadding(0, dp(4), 0, dp(4))
+        })
     }
 
     private fun addAction(parent: LinearLayout, text: String, action: () -> Unit) {
         parent.addView(TextView(this).apply {
-            this.text = text; textSize = 17f; setTextColor(Color.BLACK); gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(13), 0, dp(13)); isClickable = true; setOnClickListener { action() }
+            this.text = text
+            textSize = 15f
+            setTextColor(Color.rgb(55, 53, 47))
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(12), 0, dp(12))
+            isClickable = true
+            setOnClickListener { action() }
         })
     }
 
     private fun addRule(parent: LinearLayout) {
-        parent.addView(View(this).apply { setBackgroundColor(Color.rgb(225, 225, 220)); layoutParams = LinearLayout.LayoutParams(-1, dp(1)).apply { topMargin = dp(5); bottomMargin = dp(5) } })
+        parent.addView(View(this).apply {
+            setBackgroundColor(Color.rgb(227, 226, 224))
+            layoutParams = LinearLayout.LayoutParams(-1, dp(1)).apply {
+                topMargin = dp(5)
+                bottomMargin = dp(5)
+            }
+        })
     }
 
     private fun closeMenu() {

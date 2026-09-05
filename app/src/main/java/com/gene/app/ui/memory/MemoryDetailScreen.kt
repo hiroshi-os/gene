@@ -1,15 +1,10 @@
 package com.gene.app.ui.memory
 
-import android.Manifest
-import android.content.Context
-import android.content.Intent
-import android.content.pm.PackageManager
 import android.media.MediaPlayer
 import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,107 +13,128 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.DeleteOutline
-import androidx.compose.material.icons.outlined.Mic
-import androidx.compose.material.icons.outlined.TextSnippet
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
+import androidx.compose.ui.unit.sp
 import com.gene.app.data.GeneDatabase
 import com.gene.app.data.Interaction
 import com.gene.app.data.Person
 import com.gene.app.data.TRANSCRIPTION_PENDING
 import com.gene.app.data.TRANSCRIPTION_UNAVAILABLE
 import com.gene.app.data.TYPE_AUDIO
-import com.gene.app.data.TYPE_TEXT
+import com.gene.app.ui.common.GeneGlassIconButton
 import com.gene.app.ui.common.asDate
-import com.gene.app.ui.theme.GeneGray
+import com.gene.app.ui.common.geneCardSurface
+import com.gene.app.ui.common.geneHazeSource
+import com.gene.app.ui.common.rememberGeneHazeState
+import com.gene.app.ui.theme.GeneFontFamily
+import com.gene.app.ui.theme.GeneRadius
+import com.gene.app.ui.theme.GeneSpace
+import com.gene.app.ui.theme.NotionDarkBg
+import com.gene.app.ui.theme.rememberGeneColors
 
-@OptIn(ExperimentalMaterial3Api::class)
+private val ButtonShape = RoundedCornerShape(GeneRadius.sm)
+
 @Composable
 fun MemoryDetailScreen(
-    memory: Interaction,
     person: Person,
+    memory: Interaction,
     db: GeneDatabase,
     onBack: () -> Unit
 ) {
+    val dark = MaterialTheme.colorScheme.background == NotionDarkBg
+    val colors = rememberGeneColors(dark)
+    val hazeState = rememberGeneHazeState()
     val context = LocalContext.current
-    var playing by remember { mutableStateOf(false) }
     var player by remember { mutableStateOf<MediaPlayer?>(null) }
-    DisposableEffect(memory.id) { onDispose { player?.release(); player = null } }
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(memoryTypeLabel(memory.type), style = MaterialTheme.typography.titleMedium) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, "Back") } },
-                actions = {
-                    IconButton(onClick = { db.deleteInteraction(memory.id); onBack() }) {
-                        Icon(Icons.Outlined.DeleteOutline, "Delete memory")
-                    }
-                }
-            )
+    var playing by remember { mutableStateOf(false) }
+    val playInteraction = remember { MutableInteractionSource() }
+
+    DisposableEffect(memory.id) {
+        onDispose {
+            player?.release()
+            player = null
+            playing = false
         }
-    ) { padding ->
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.bg)
+    ) {
         Column(
-            Modifier
+            modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 22.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
+                .geneHazeSource(hazeState)
+                .statusBarsPadding()
+                .padding(top = 56.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Spacer(Modifier.height(14.dp))
-            Text("${person.name} · ${memory.createdAt.asDate()}", color = GeneGray, style = MaterialTheme.typography.bodyLarge)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "${person.name} · ${memory.createdAt.asDate()}",
+                color = colors.textTertiary,
+                fontSize = 13.sp,
+                fontFamily = GeneFontFamily
+            )
+
             if (memory.type == TYPE_AUDIO && memory.audioUri != null) {
-                Surface(
-                    Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                    shape = RoundedCornerShape(20.dp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .geneCardSurface(colors, RoundedCornerShape(12.dp))
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            listOf(26, 42, 18, 34, 48, 22, 38, 30, 16, 40, 24, 32).forEach { height ->
-                                Box(Modifier.width(5.dp).height(height.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp)))
-                            }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        listOf(20, 34, 14, 28, 40, 18, 32, 24, 12, 36, 20, 28).forEach { bar ->
+                            Box(
+                                Modifier
+                                    .width(4.dp)
+                                    .height(bar.dp)
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .background(colors.accent.copy(alpha = 0.5f))
+                            )
                         }
-                        Button(
-                            onClick = {
+                    }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                            .clip(ButtonShape)
+                            .background(if (playing) colors.pill else colors.pillActive)
+                            .clickable(interactionSource = playInteraction, indication = null) {
                                 if (playing) {
                                     player?.pause()
                                     playing = false
@@ -130,146 +146,78 @@ fun MemoryDetailScreen(
                                     playing = true
                                 }
                             },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(if (playing) "Pause recording" else "Play recording")
-                        }
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (playing) "Pause recording" else "Play recording",
+                            color = if (playing) colors.textPrimary else colors.onPillActive,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            fontFamily = GeneFontFamily
+                        )
                     }
                 }
             }
+
             Text(
-                if (memory.type == TYPE_AUDIO && memory.transcriptionStatus == TRANSCRIPTION_PENDING) "Transcription is still processing in the background."
-                else memory.transcript?.takeIf { it.isNotBlank() } ?: memory.body,
-                style = MaterialTheme.typography.titleMedium
+                text = if (memory.type == TYPE_AUDIO && memory.transcriptionStatus == TRANSCRIPTION_PENDING) {
+                    "Transcription is still processing in the background."
+                } else {
+                    memory.transcript?.takeIf { it.isNotBlank() } ?: memory.body
+                },
+                color = colors.textPrimary,
+                fontSize = 17.sp,
+                lineHeight = 26.sp,
+                fontWeight = FontWeight.Medium,
+                fontFamily = GeneFontFamily
             )
+
             if (memory.type == TYPE_AUDIO && memory.transcriptionStatus == TRANSCRIPTION_UNAVAILABLE) {
                 Text(
-                    "The audio is saved on this device. Add a compatible transcription provider in Settings if you want a text transcript.",
-                    color = GeneGray,
-                    style = MaterialTheme.typography.bodyLarge
+                    text = "The audio is saved on this device. Add a compatible transcription provider in Settings if you want a text transcript.",
+                    color = colors.textSecondary,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    fontFamily = GeneFontFamily
                 )
             }
         }
-    }
-}
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun CaptureSheet(
-    person: Person,
-    db: GeneDatabase,
-    onDismiss: () -> Unit,
-    onSaved: () -> Unit
-) {
-    var text by remember { mutableStateOf("") }
-    var secondText by remember { mutableStateOf("") }
-    var mode by remember { mutableStateOf(TYPE_TEXT) }
-    var pendingSpeech by remember { mutableStateOf(false) }
-    val context = LocalContext.current
-    val speechLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == android.app.Activity.RESULT_OK) {
-            result.data?.getStringArrayListExtra("android.speech.extra.RESULTS")?.firstOrNull()?.let { text = it }
-        }
-        pendingSpeech = false
-    }
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) {
-            speechLauncher.launch(Intent("android.speech.action.RECOGNIZE_SPEECH").apply {
-                putExtra("android.speech.extra.LANGUAGE_MODEL", "free_form")
-                putExtra("android.speech.extra.PROMPT", "Speak a memory")
-            })
-        } else {
-            pendingSpeech = false
-        }
-    }
-    LaunchedEffect(pendingSpeech) {
-        if (pendingSpeech) {
-            if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-                speechLauncher.launch(Intent("android.speech.action.RECOGNIZE_SPEECH").apply {
-                    putExtra("android.speech.extra.LANGUAGE_MODEL", "free_form")
-                    putExtra("android.speech.extra.PROMPT", "Speak a memory")
-                })
-            } else {
-                permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-            }
-        }
-    }
-    val title = when (mode) {
-        TYPE_AUDIO -> "Say it"
-        "quote" -> "Save a quote"
-        "signal" -> "Notice a signal"
-        "pattern" -> "Name a pattern"
-        "recommendation" -> "Save a recommendation"
-        "favorite" -> "Save a favorite"
-        "feeling" -> "Notice a feeling"
-        "question" -> "Keep an open question"
-        else -> "Capture something"
-    }
-    val saveText = when (mode) {
-        "quote" -> if (text.isBlank()) "" else "Quote · \"${text.trim()}\""
-        "signal" -> if (text.isBlank()) "" else "Signal · ${text.trim()}${if (secondText.isBlank()) "" else " | Possible meaning · ${secondText.trim()}"}"
-        "pattern" -> if (text.isBlank()) "" else "Pattern · ${text.trim()}"
-        "recommendation" -> if (text.isBlank()) "" else "Recommendation · ${text.trim()}"
-        "favorite" -> if (text.isBlank()) "" else "Favorite · ${text.trim()}"
-        "feeling" -> if (text.isBlank()) "" else "Feeling · ${text.trim()}"
-        "question" -> if (text.isBlank()) "" else "Open question · ${text.trim()}"
-        else -> text.trim()
-    }
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.background) {
-        Column(
-            Modifier
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
                 .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 22.dp)
-                .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(15.dp)
+                .statusBarsPadding()
+                .padding(horizontal = GeneSpace.sm, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(GeneSpace.xs)
         ) {
-            Text(title, style = MaterialTheme.typography.titleLarge)
-            Text("Choose the shape that fits the moment.", color = GeneGray, style = MaterialTheme.typography.bodyLarge)
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                item { AssistChip(onClick = { mode = TYPE_TEXT }, label = { Text("Note") }, leadingIcon = { Icon(Icons.Outlined.TextSnippet, null) }) }
-                item { AssistChip(onClick = { mode = TYPE_AUDIO; pendingSpeech = true }, label = { Text("Voice") }, leadingIcon = { Icon(Icons.Outlined.Mic, null) }) }
-                item { AssistChip(onClick = { mode = "quote" }, label = { Text("Quote") }) }
-                item { AssistChip(onClick = { mode = "signal" }, label = { Text("Signal") }) }
-                item { AssistChip(onClick = { mode = "pattern" }, label = { Text("Pattern") }) }
-                item { AssistChip(onClick = { mode = "recommendation" }, label = { Text("Recommend") }) }
-                item { AssistChip(onClick = { mode = "favorite" }, label = { Text("Favorite") }) }
-                item { AssistChip(onClick = { mode = "feeling" }, label = { Text("Feeling") }) }
-                item { AssistChip(onClick = { mode = "question" }, label = { Text("Open question") }) }
-            }
-            when (mode) {
-                TYPE_AUDIO -> {
-                    OutlinedButton(onClick = { pendingSpeech = true }, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Outlined.Mic, null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Speak now")
-                    }
-                    OutlinedTextField(value = text, onValueChange = { text = it }, label = { Text("Transcript") }, minLines = 4, modifier = Modifier.fillMaxWidth())
-                    Text("Only the transcript is saved.", color = GeneGray, style = MaterialTheme.typography.bodyMedium)
-                }
-                "quote" -> OutlinedTextField(value = text, onValueChange = { text = it }, label = { Text("What did they say?") }, minLines = 4, modifier = Modifier.fillMaxWidth())
-                "signal" -> {
-                    OutlinedTextField(value = text, onValueChange = { text = it }, label = { Text("What happened?") }, minLines = 3, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = secondText, onValueChange = { secondText = it }, label = { Text("What might it mean? Optional") }, minLines = 2, modifier = Modifier.fillMaxWidth())
-                }
-                "pattern" -> OutlinedTextField(value = text, onValueChange = { text = it }, label = { Text("What keeps repeating?") }, minLines = 4, modifier = Modifier.fillMaxWidth())
-                "recommendation" -> OutlinedTextField(value = text, onValueChange = { text = it }, label = { Text("What did they recommend?") }, minLines = 4, modifier = Modifier.fillMaxWidth())
-                "favorite" -> OutlinedTextField(value = text, onValueChange = { text = it }, label = { Text("What do they love?") }, minLines = 4, modifier = Modifier.fillMaxWidth())
-                "feeling" -> OutlinedTextField(value = text, onValueChange = { text = it }, label = { Text("What mood did you notice?") }, minLines = 4, modifier = Modifier.fillMaxWidth())
-                "question" -> OutlinedTextField(value = text, onValueChange = { text = it }, label = { Text("What are you still wondering?") }, minLines = 4, modifier = Modifier.fillMaxWidth())
-                else -> OutlinedTextField(value = text, onValueChange = { text = it }, label = { Text("What happened?") }, minLines = 4, modifier = Modifier.fillMaxWidth())
-            }
-            Button(
-                onClick = {
-                    if (saveText.isNotBlank()) {
-                        db.addInteraction(person.id, mode, saveText)
-                        onSaved()
-                    }
-                },
-                enabled = saveText.isNotBlank(),
-                modifier = Modifier.fillMaxWidth()
+            GeneGlassIconButton(
+                colors = colors,
+                hazeState = hazeState,
+                onClick = onBack,
+                contentDescription = "Back"
             ) {
-                Text("Keep memory")
+                Icon(Icons.Outlined.ArrowBack, contentDescription = null, tint = colors.textPrimary, modifier = Modifier.size(18.dp))
+            }
+            Text(
+                text = memoryTypeLabel(memory.type),
+                color = colors.textPrimary,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                fontFamily = GeneFontFamily,
+                modifier = Modifier.weight(1f)
+            )
+            GeneGlassIconButton(
+                colors = colors,
+                hazeState = hazeState,
+                onClick = {
+                    db.deleteInteraction(memory.id)
+                    onBack()
+                },
+                contentDescription = "Delete memory"
+            ) {
+                Icon(Icons.Outlined.DeleteOutline, contentDescription = null, tint = colors.danger, modifier = Modifier.size(18.dp))
             }
         }
     }

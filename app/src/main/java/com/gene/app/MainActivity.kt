@@ -11,8 +11,9 @@ class MainActivity : ComponentActivity() {
         val initialPersonId = savedInstanceState?.getLong("person_id", intent?.getLongExtra("person_id", -1L) ?: -1L)
             ?: intent?.getLongExtra("person_id", -1L)
             ?: -1L
+        val openCapture = intent?.getBooleanExtra("open_capture", false) == true
         setContent {
-            GeneApp(initialPersonId)
+            GeneApp(initialPersonId = initialPersonId, initialOpenCapture = openCapture)
         }
     }
 
