@@ -35,7 +35,7 @@ The generated APK is under `app/build/outputs/apk/debug/app-debug.apk`.
 
 ### Gene AI
 
-Uses the monorepo server under `server/`. No user API key. Configure the Gene AI endpoint in Settings (default `https://api.withgene.app/v1`). For local development against the emulator, use `http://10.0.2.2:8000/v1`. See `server/README.md`.
+Uses the monorepo server under `server/`. No user API key; the app talks to Gene's built-in gateway. See `server/README.md` for running the gateway locally.
 
 ### BYOK
 
