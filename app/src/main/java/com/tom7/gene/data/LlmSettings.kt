@@ -15,7 +15,7 @@ object LlmSettings {
     const val MODE_GENE_AI = "gene_ai"
     const val MODE_BYOK = "byok"
 
-    /** Default Gene AI base URL (OpenAI-compatible /v1). Override in Settings for local/dev. */
+    /** Built-in Gene AI base URL (OpenAI-compatible /v1). Not user-configurable. */
     const val DEFAULT_GENE_AI_ENDPOINT = "https://api.withgene.app/v1"
 
     const val DEFAULT_BYOK_MODEL = "gpt-5-mini"
@@ -55,11 +55,8 @@ object LlmSettings {
     }
 
     private fun resolveGeneAi(prefs: SharedPreferences): Resolved {
-        val base = prefs.getString("gene_ai_endpoint", DEFAULT_GENE_AI_ENDPOINT)
-            .orEmpty()
-            .ifBlank { DEFAULT_GENE_AI_ENDPOINT }
-        val chat = normalizeChatEndpoint(base)
-        val transcription = normalizeTranscriptionEndpoint(base)
+        val chat = normalizeChatEndpoint(DEFAULT_GENE_AI_ENDPOINT)
+        val transcription = normalizeTranscriptionEndpoint(DEFAULT_GENE_AI_ENDPOINT)
         val model = prefs.getString("gene_ai_model", DEFAULT_GENE_AI_MODEL)
             .orEmpty()
             .ifBlank { DEFAULT_GENE_AI_MODEL }

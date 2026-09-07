@@ -96,9 +96,6 @@ fun SettingsScreen(
     val prefs = remember { context.getSharedPreferences(LlmSettings.PREFS, Context.MODE_PRIVATE) }
     var bubble by remember { mutableStateOf(prefs.getBoolean("bubble_enabled", false)) }
     var llmMode by remember { mutableStateOf(LlmSettings.mode(prefs)) }
-    var geneAiEndpoint by remember {
-        mutableStateOf(prefs.getString("gene_ai_endpoint", LlmSettings.DEFAULT_GENE_AI_ENDPOINT).orEmpty())
-    }
     var endpoint by remember { mutableStateOf(prefs.getString("llm_endpoint", "").orEmpty()) }
     var apiKey by remember { mutableStateOf(prefs.getString("llm_api_key", "").orEmpty()) }
     var model by remember { mutableStateOf(prefs.getString("llm_model", LlmSettings.DEFAULT_BYOK_MODEL).orEmpty()) }
@@ -289,19 +286,11 @@ fun SettingsScreen(
                     Spacer(Modifier.height(14.dp))
                     if (llmMode == LlmSettings.MODE_GENE_AI) {
                         Text(
-                            "No API key needed. Point at Gene's server, or a local gateway while developing.",
+                            "No API key needed. Gene routes requests through its hosted gateway.",
                             color = colors.textSecondary,
                             fontSize = 13.sp,
                             fontFamily = GeneFontFamily,
                             lineHeight = 18.sp
-                        )
-                        Spacer(Modifier.height(12.dp))
-                        SoftSettingsField(
-                            value = geneAiEndpoint,
-                            onValueChange = { geneAiEndpoint = it; saved = false },
-                            label = "Gene AI endpoint",
-                            placeholder = LlmSettings.DEFAULT_GENE_AI_ENDPOINT,
-                            colors = colors
                         )
                     } else {
                         Text(
@@ -340,7 +329,6 @@ fun SettingsScreen(
                         onClick = {
                             prefs.edit()
                                 .putString("llm_mode", llmMode)
-                                .putString("gene_ai_endpoint", geneAiEndpoint.trim())
                                 .putString("llm_endpoint", endpoint.trim())
                                 .putString("llm_model", model.trim())
                                 .putString("llm_api_key", apiKey.trim())
