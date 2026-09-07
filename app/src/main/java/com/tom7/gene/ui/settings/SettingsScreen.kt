@@ -27,12 +27,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.BubbleChart
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Memory
-import androidx.compose.material.icons.outlined.BubbleChart
+import androidx.compose.material.icons.outlined.VpnKey
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -248,23 +250,17 @@ fun SettingsScreen(
                 Spacer(Modifier.height(24.dp))
                 SettingsSectionTitle("Intelligence", "Choose how Gene thinks for you", colors)
                 SettingsGroup(colors) {
-                    Text(
-                        "Gene AI uses Gene's hosted gateway. BYOK keeps your own OpenAI-compatible endpoint and key on device.",
-                        color = colors.textSecondary,
-                        fontSize = 13.sp,
-                        fontFamily = GeneFontFamily,
-                        lineHeight = 18.sp
-                    )
-                    Spacer(Modifier.height(14.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         IntelligenceModeChip(
                             title = "Gene AI",
-                            subtitle = "Hosted",
+                            subtitle = "Default",
+                            icon = Icons.Outlined.AutoAwesome,
                             selected = llmMode == LlmSettings.MODE_GENE_AI,
                             colors = colors,
+                            tileColor = colors.pastel(2),
                             modifier = Modifier.weight(1f),
                             onClick = {
                                 llmMode = LlmSettings.MODE_GENE_AI
@@ -274,8 +270,10 @@ fun SettingsScreen(
                         IntelligenceModeChip(
                             title = "BYOK",
                             subtitle = "Your key",
+                            icon = Icons.Outlined.VpnKey,
                             selected = llmMode == LlmSettings.MODE_BYOK,
                             colors = colors,
+                            tileColor = colors.pastel(5),
                             modifier = Modifier.weight(1f),
                             onClick = {
                                 llmMode = LlmSettings.MODE_BYOK
@@ -283,16 +281,8 @@ fun SettingsScreen(
                             }
                         )
                     }
-                    Spacer(Modifier.height(14.dp))
-                    if (llmMode == LlmSettings.MODE_GENE_AI) {
-                        Text(
-                            "No API key needed. Gene routes requests through its hosted gateway.",
-                            color = colors.textSecondary,
-                            fontSize = 13.sp,
-                            fontFamily = GeneFontFamily,
-                            lineHeight = 18.sp
-                        )
-                    } else {
+                    if (llmMode == LlmSettings.MODE_BYOK) {
+                        Spacer(Modifier.height(14.dp))
                         Text(
                             "Enter an OpenAI-compatible /v1 base URL or a full /v1/chat/completions URL, plus your key. Leave blank to stay fully offline.",
                             color = colors.textSecondary,
@@ -425,7 +415,7 @@ fun SettingsScreen(
                                 lineHeight = 18.sp
                             )
                             Text(
-                                "Gene AI sends only locally selected context to Gene's gateway. BYOK sends that same context to the endpoint you configure. Persona replies are working hypotheses, not certainty about another person's private thoughts.",
+                                "Remote analysis is opt-in. When enabled, only locally selected context is sent for a reply. Persona replies are working hypotheses, not certainty about another person's private thoughts.",
                                 color = colors.textSecondary,
                                 fontSize = 13.sp,
                                 fontFamily = GeneFontFamily,
@@ -568,8 +558,10 @@ fun SettingsScreen(
 private fun IntelligenceModeChip(
     title: String,
     subtitle: String,
+    icon: ImageVector,
     selected: Boolean,
     colors: GeneColors,
+    tileColor: Color,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
@@ -584,21 +576,37 @@ private fun IntelligenceModeChip(
             )
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text(
-            title,
-            color = colors.textPrimary,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.SemiBold,
-            fontFamily = GeneFontFamily
-        )
-        Text(
-            subtitle,
-            color = colors.textSecondary,
-            fontSize = 12.sp,
-            fontFamily = GeneFontFamily
-        )
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(IconTileShape)
+                .background(tileColor),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = colors.textPrimary.copy(alpha = 0.65f),
+                modifier = Modifier.size(15.dp)
+            )
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                title,
+                color = colors.textPrimary,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                fontFamily = GeneFontFamily
+            )
+            Text(
+                subtitle,
+                color = colors.textSecondary,
+                fontSize = 12.sp,
+                fontFamily = GeneFontFamily
+            )
+        }
     }
 }
 
