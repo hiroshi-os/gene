@@ -9,6 +9,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +25,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -61,7 +63,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -69,6 +73,7 @@ import androidx.core.content.ContextCompat
 import com.tom7.gene.data.ChatMessage
 import com.tom7.gene.data.ChatSession
 import com.tom7.gene.data.GeneDatabase
+import com.tom7.gene.data.InsightEngine
 import com.tom7.gene.data.Interaction
 import com.tom7.gene.data.LocalRelevanceSearch
 import com.tom7.gene.data.Person
@@ -108,7 +113,7 @@ fun ChatScreen(
     var savedSessionId by remember(session?.id) { mutableStateOf(session?.id) }
     var sessionTitle by remember(session?.id) { mutableStateOf(session?.title ?: "New conversation") }
     var messages by remember(session?.id) { mutableStateOf(session?.let { db.messages(it.id) } ?: emptyList()) }
-    var draft by remember { mutableStateOf("") }
+    var draft by remember { mutableStateOf(TextFieldValue("")) }
     var sending by remember { mutableStateOf(false) }
     var expandedMessageId by remember { mutableStateOf<Long?>(null) }
     var menuOpen by remember { mutableStateOf(false) }
@@ -120,11 +125,14 @@ fun ChatScreen(
     val scope = rememberCoroutineScope()
     val memories = remember(person.id) { db.interactions(person.id) }
     val memoryMap = remember(memories) { memories.associateBy { it.id } }
+    val traits = remember(person.id, memories) { InsightEngine.persona(person, memories).traits }
+    val fullSummary = person.summary
 
     val speechLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == android.app.Activity.RESULT_OK) {
             result.data?.getStringArrayListExtra("android.speech.extra.RESULTS")?.firstOrNull()?.let { transcript ->
-                draft = listOf(draft.trim(), transcript).filter { it.isNotBlank() }.joinToString(" ")
+                val merged = listOf(draft.text.trim(), transcript).filter { it.isNotBlank() }.joinToString(" ")
+                draft = TextFieldValue(merged, selection = TextRange(merged.length))
             }
         }
         listening = false
@@ -169,9 +177,9 @@ fun ChatScreen(
     }
 
     fun send() {
-        val question = draft.trim()
+        val question = draft.text.trim()
         if (question.isBlank() || sending) return
-        draft = ""
+        draft = TextFieldValue("")
         val wasTemporary = temporary
         val id = if (wasTemporary) null else savedSessionId ?: db.addSession(person.id, mode = mode)
         if (id != null) {
@@ -207,6 +215,14 @@ fun ChatScreen(
         ) {
             item {
                 Spacer(Modifier.height(12.dp))
+                if (mode == CHAT_ASK) {
+                    AskPersonaContext(
+                        person = person,
+                        summary = fullSummary,
+                        traits = traits,
+                        colors = colors
+                    )
+                }
                 if (messages.isEmpty()) ChatWelcome(person.name, mode, temporary, colors)
                 if (sending) {
                     Text(
@@ -365,7 +381,7 @@ fun ChatScreen(
                 }
             },
             trailing = {
-                val canSend = draft.isNotBlank() && !sending
+                val canSend = draft.text.isNotBlank() && !sending
                 GeneBarAction(
                     onClick = { send() },
                     enabled = canSend,
@@ -418,6 +434,79 @@ fun ChatScreen(
                     shape = RoundedCornerShape(GeneRadius.sm)
                 ) {
                     Text("Save name")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AskPersonaContext(
+    person: Person,
+    summary: String?,
+    traits: List<String>,
+    colors: GeneColors
+) {
+    val cardShape = RoundedCornerShape(GeneRadius.lg)
+    val traitShape = RoundedCornerShape(GeneRadius.sm)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(GeneSpace.sm)
+    ) {
+        if (!summary.isNullOrBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(cardShape)
+                    .background(colors.pastel(0).copy(alpha = 0.85f))
+                    .border(0.5.dp, colors.border.copy(alpha = 0.6f), cardShape)
+                    .padding(GeneSpace.md),
+                verticalArrangement = Arrangement.spacedBy(GeneSpace.xs)
+            ) {
+                Text(
+                    text = if (person.isSelf) "About you" else "About ${person.name}",
+                    color = colors.textSecondary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    fontFamily = GeneFontFamily
+                )
+                Text(
+                    text = summary,
+                    color = colors.textPrimary,
+                    fontSize = 14.sp,
+                    lineHeight = 21.sp,
+                    fontFamily = GeneFontFamily
+                )
+            }
+        }
+        if (traits.isNotEmpty()) {
+            Text(
+                text = "Traits",
+                color = colors.textSecondary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                fontFamily = GeneFontFamily
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(GeneSpace.xs)
+            ) {
+                traits.forEachIndexed { index, trait ->
+                    Text(
+                        text = trait,
+                        color = colors.textPrimary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        fontFamily = GeneFontFamily,
+                        modifier = Modifier
+                            .clip(traitShape)
+                            .background(colors.pastel(index + 1))
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                    )
                 }
             }
         }

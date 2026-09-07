@@ -33,8 +33,9 @@ import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Event
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.FormatQuote
-import androidx.compose.material.icons.outlined.HelpOutline
+import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
@@ -67,7 +68,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tom7.gene.data.GeneDatabase
-import com.tom7.gene.data.InsightEngine
 import com.tom7.gene.data.Interaction
 import com.tom7.gene.data.Person
 import com.tom7.gene.data.RemoteInsightEngine
@@ -122,6 +122,7 @@ fun PersonScreen(
     onAsk: () -> Unit,
     onSearch: () -> Unit,
     onCalendar: () -> Unit,
+    onOpenGraph: () -> Unit,
     onMemory: (Long) -> Unit,
     onAllMemories: () -> Unit,
     onAllChats: () -> Unit,
@@ -141,8 +142,14 @@ fun PersonScreen(
     var personFavorite by remember(person.id, person.favorite) { mutableStateOf(person.favorite) }
     var summaryRefreshing by remember { mutableStateOf(false) }
     var displayedSummary by remember(person.id, person.summary) { mutableStateOf(person.summary) }
-    val persona = remember(memories) { InsightEngine.persona(person, memories) }
     val sessions = db.sessions(person.id)
+    val selfRelationLabel = remember(person.id) {
+        if (person.isSelf) null
+        else {
+            val self = db.selfPerson() ?: return@remember null
+            db.relationshipBetween(self.id, person.id)?.label
+        }
+    }
     val quoteSet = remember(memories) { memories.filter { it.type == "quote" }.shuffled().take(3) }
     var quoteIndex by remember(person.id) { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
@@ -248,6 +255,20 @@ fun PersonScreen(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
+                    if (!selfRelationLabel.isNullOrBlank()) {
+                        Spacer(Modifier.height(GeneSpace.sm))
+                        Text(
+                            text = selfRelationLabel,
+                            color = colors.textPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            fontFamily = GeneFontFamily,
+                            modifier = Modifier
+                                .clip(TraitShape)
+                                .background(colors.pastel(person.id.toInt()))
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
+                    }
                 }
             }
 
@@ -255,6 +276,7 @@ fun PersonScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
                         .padding(vertical = 2.dp),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
@@ -271,10 +293,10 @@ fun PersonScreen(
                             filled = true
                         )
                         QuickActionChip(
-                            label = "Ask",
-                            icon = Icons.Outlined.HelpOutline,
+                            label = "Relations",
+                            icon = Icons.Outlined.Hub,
                             colors = colors,
-                            onClick = onAsk
+                            onClick = onOpenGraph
                         )
                         QuickActionChip(
                             label = "Calendar",
@@ -289,16 +311,31 @@ fun PersonScreen(
             item {
                 PersonSectionLabel("Summary", colors)
                 Spacer(Modifier.height(GeneSpace.xs))
+                val summaryReady = memories.size >= 10
+                val summaryClick = remember { MutableInteractionSource() }
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(CardShape)
                         .background(colors.pastel(0).copy(alpha = if (dark) 0.55f else 0.95f))
-                        .border(0.5.dp, colors.border.copy(alpha = 0.6f), CardShape)
+                        .border(
+                            width = if (summaryReady) 1.dp else 0.5.dp,
+                            color = if (summaryReady) colors.accent.copy(alpha = 0.35f) else colors.border.copy(alpha = 0.6f),
+                            shape = CardShape
+                        )
+                        .then(
+                            if (summaryReady) {
+                                Modifier.clickable(
+                                    interactionSource = summaryClick,
+                                    indication = null,
+                                    onClick = onAsk
+                                )
+                            } else Modifier
+                        )
                         .padding(GeneSpace.md),
                     verticalArrangement = Arrangement.spacedBy(GeneSpace.sm)
                 ) {
-                    if (memories.size >= 10) {
+                    if (summaryReady) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
@@ -337,8 +374,29 @@ fun PersonScreen(
                             color = colors.textPrimary,
                             fontSize = 14.sp,
                             fontFamily = GeneFontFamily,
-                            lineHeight = 21.sp
+                            lineHeight = 21.sp,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
                         )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = if (person.isSelf) "Ask about yourself" else "Ask about ${person.name}",
+                                color = colors.accent,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                fontFamily = GeneFontFamily
+                            )
+                            Icon(
+                                Icons.Outlined.ExpandMore,
+                                contentDescription = "Expand summary",
+                                tint = colors.accent,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     } else {
                         Text(
                             text = "Add ${10 - memories.size} more memor${if (10 - memories.size == 1) "y" else "ies"} for a generated summary.",
@@ -346,33 +404,6 @@ fun PersonScreen(
                             fontSize = 13.sp,
                             fontFamily = GeneFontFamily
                         )
-                    }
-                }
-            }
-
-            if (persona.traits.isNotEmpty()) {
-                item {
-                    PersonSectionLabel("Traits", colors)
-                    Spacer(Modifier.height(GeneSpace.xs))
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(GeneSpace.xs)
-                    ) {
-                        persona.traits.forEachIndexed { index, trait ->
-                            Text(
-                                text = trait,
-                                color = colors.textPrimary,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium,
-                                fontFamily = GeneFontFamily,
-                                modifier = Modifier
-                                    .clip(TraitShape)
-                                    .background(colors.pastel(index + 1))
-                                    .padding(horizontal = 12.dp, vertical = 8.dp)
-                            )
-                        }
                     }
                 }
             }

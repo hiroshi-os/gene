@@ -36,6 +36,7 @@ import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Text
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -262,11 +263,28 @@ fun GeneGlassInputBar(
     leading: (@Composable RowScope.() -> Unit)? = null,
     trailing: (@Composable RowScope.() -> Unit)? = null,
 ) {
+    // Same pattern as foundation BasicTextField(String): keep selection in state so
+    // rebuilding from a String each frame does not snap the caret to index 0.
+    var fieldState by remember { mutableStateOf(TextFieldValue(text = value)) }
+    val field = fieldState.copy(text = value)
+    SideEffect {
+        if (field.selection != fieldState.selection ||
+            field.composition != fieldState.composition
+        ) {
+            fieldState = field
+        }
+    }
+    var lastText by remember(value) { mutableStateOf(value) }
     GeneGlassInputBar(
         colors = colors,
         hazeState = hazeState,
-        value = TextFieldValue(value),
-        onValueChange = { onValueChange(it.text) },
+        value = field,
+        onValueChange = { next ->
+            fieldState = next
+            val changed = lastText != next.text
+            lastText = next.text
+            if (changed) onValueChange(next.text)
+        },
         placeholder = placeholder,
         modifier = modifier,
         enabled = enabled,

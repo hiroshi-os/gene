@@ -7,8 +7,8 @@ sealed interface AppScreen {
     data object Home : AppScreen
     /** Global search across people, chats, and memories. */
     data object GlobalSearch : AppScreen
-    /** Obsidian-style people relationship graph. */
-    data object RelationshipGraph : AppScreen
+    /** Obsidian-style people relationship graph. Optionally focus a person. */
+    data class RelationshipGraph(val selectedPersonId: Long? = null) : AppScreen
     /** [openCapture] jumps straight into memory capture after picking a person. */
     data class PersonDetail(val id: Long, val openCapture: Boolean = false) : AppScreen
     data class Chat(val personId: Long, val sessionId: Long?, val mode: String = CHAT_TALK) : AppScreen

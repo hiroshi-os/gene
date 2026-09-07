@@ -80,7 +80,8 @@ fun GeneApp(initialPersonId: Long = -1L, initialOpenCapture: Boolean = false) {
         screen = when (val current = screen) {
             is AppScreen.Chat -> AppScreen.PersonDetail(current.personId)
             is AppScreen.GroupChat -> AppScreen.Home
-            is AppScreen.RelationshipGraph -> AppScreen.Home
+            is AppScreen.RelationshipGraph ->
+                current.selectedPersonId?.let { AppScreen.PersonDetail(it) } ?: AppScreen.Home
             is AppScreen.Search -> AppScreen.PersonDetail(current.personId)
             is AppScreen.AllChats -> AppScreen.PersonDetail(current.personId)
             is AppScreen.Calendar -> AppScreen.PersonDetail(current.personId)
@@ -132,7 +133,7 @@ fun GeneApp(initialPersonId: Long = -1L, initialOpenCapture: Boolean = false) {
                         screen = AppScreen.GroupChat(id)
                     }
                 },
-                onOpenGraph = { screen = AppScreen.RelationshipGraph },
+                onOpenGraph = { screen = AppScreen.RelationshipGraph() },
                 onCapturePerson = { personId ->
                     screen = AppScreen.PersonDetail(personId, openCapture = true)
                 },
@@ -171,6 +172,7 @@ fun GeneApp(initialPersonId: Long = -1L, initialOpenCapture: Boolean = false) {
                         onAsk = { screen = AppScreen.Chat(person.id, null, CHAT_ASK) },
                         onSearch = { screen = AppScreen.Search(person.id) },
                         onCalendar = { screen = AppScreen.Calendar(person.id) },
+                        onOpenGraph = { screen = AppScreen.RelationshipGraph(person.id) },
                         onMemory = { memoryId -> screen = AppScreen.MemoryDetail(person.id, memoryId) },
                         onAllMemories = { screen = AppScreen.AllMemories(person.id) },
                         onAllChats = { screen = AppScreen.AllChats(person.id) },
@@ -281,11 +283,13 @@ fun GeneApp(initialPersonId: Long = -1L, initialOpenCapture: Boolean = false) {
                     )
                 }
             }
-            AppScreen.RelationshipGraph -> RelationshipGraphScreen(
+            is AppScreen.RelationshipGraph -> RelationshipGraphScreen(
                 db = db,
+                initialSelectedPersonId = current.selectedPersonId,
                 onBack = {
                     refresh++
-                    screen = AppScreen.Home
+                    screen = current.selectedPersonId?.let { AppScreen.PersonDetail(it) }
+                        ?: AppScreen.Home
                 },
                 onOpenPerson = { personId ->
                     screen = AppScreen.PersonDetail(personId)
