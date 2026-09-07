@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.gene.app"
+    namespace = "com.tom7.gene"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.gene.app"
+        applicationId = "com.tom7.gene"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
