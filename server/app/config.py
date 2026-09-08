@@ -12,8 +12,8 @@ class Settings(BaseSettings):
 
     groq_api_key: str = ""
     groq_base_url: str = "https://api.groq.com/openai/v1"
-    groq_chat_model: str = "llama-3.3-70b-versatile"
-    groq_transcription_model: str = "whisper-large-v3"
+    groq_chat_model: str = "openai/gpt-oss-20b"
+    groq_transcription_model: str = "whisper-large-v3-turbo"
     host: str = "0.0.0.0"
     port: int = 8000
     # Soft per-request caps so one noisy client cannot monopolize a worker.

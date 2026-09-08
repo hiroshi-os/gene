@@ -98,7 +98,8 @@ private data class GraphNode(
 fun RelationshipGraphScreen(
     db: GeneDatabase,
     onBack: () -> Unit,
-    onOpenPerson: (Long) -> Unit
+    onOpenPerson: (Long) -> Unit,
+    initialSelectedPersonId: Long? = null
 ) {
     val colors = rememberGeneColors(MaterialTheme.colorScheme.background.luminance() < 0.5f)
     val hazeState = rememberGeneHazeState()
@@ -110,10 +111,11 @@ fun RelationshipGraphScreen(
 
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
-    var selectedPersonId by remember { mutableStateOf<Long?>(null) }
+    var selectedPersonId by remember { mutableStateOf(initialSelectedPersonId) }
     var selectedLinkId by remember { mutableStateOf<Long?>(null) }
     var addOpen by remember { mutableStateOf(false) }
     var editLink by remember { mutableStateOf<Relationship?>(null) }
+    var didCenterOnInitial by remember { mutableStateOf(false) }
 
     val nodes = remember { mutableStateMapOf<Long, GraphNode>() }
 
@@ -135,6 +137,15 @@ fun RelationshipGraphScreen(
         }
         val alive = people.map { it.id }.toSet()
         nodes.keys.filter { it !in alive }.forEach { nodes.remove(it) }
+    }
+
+    // Pan so the pre-selected person sits near the viewport center once the node exists.
+    LaunchedEffect(initialSelectedPersonId, nodes.size, frame) {
+        val id = initialSelectedPersonId ?: return@LaunchedEffect
+        if (didCenterOnInitial) return@LaunchedEffect
+        val node = nodes[id] ?: return@LaunchedEffect
+        offset = Offset(-node.x * scale, -node.y * scale)
+        didCenterOnInitial = true
     }
 
     // Soft force layout (Obsidian-like drift)

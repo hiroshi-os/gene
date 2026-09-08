@@ -307,8 +307,7 @@ fun HomeScreen(
             text = { Text("Removes all memories and chats for ${person.name}.", color = colors.textSecondary, fontFamily = GeneFontFamily) },
             confirmButton = {
                 TextButton(onClick = {
-                    db?.deletePerson(person.id)
-                    onRefresh()
+                    if (db?.deletePerson(person.id) == true) onRefresh()
                     personToDelete = null
                 }) { Text("Delete", color = colors.danger, fontWeight = FontWeight.Bold) }
             },
@@ -1016,7 +1015,9 @@ private fun PersonActionSheet(
             ActionRow(Icons.Outlined.PushPin, if (person.favorite) "Unpin" else "Pin", colors.textPrimary, onToggleFavorite)
             ActionRow(Icons.Outlined.Face, "Customize Memoji", colors.accent, onCustomizeMemoji)
             ActionRow(Icons.Outlined.Edit, "Rename", colors.textPrimary, onEdit)
-            ActionRow(Icons.Outlined.Delete, "Delete", colors.danger, onDelete)
+            if (!person.isSelf) {
+                ActionRow(Icons.Outlined.Delete, "Delete", colors.danger, onDelete)
+            }
         }
     }
 }
