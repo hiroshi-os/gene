@@ -19,9 +19,9 @@ object LlmSettings {
     private const val GENE_AI_ENDPOINT = "https://gene-jctr.onrender.com/v1"
 
     const val DEFAULT_BYOK_MODEL = "gpt-5-mini"
-    const val DEFAULT_GENE_AI_MODEL = "llama-3.3-70b-versatile"
+    const val DEFAULT_GENE_AI_MODEL = "openai/gpt-oss-20b"
     const val DEFAULT_BYOK_TRANSCRIPTION_MODEL = "whisper-1"
-    const val DEFAULT_GENE_AI_TRANSCRIPTION_MODEL = "whisper-large-v3"
+    const val DEFAULT_GENE_AI_TRANSCRIPTION_MODEL = "whisper-large-v3-turbo"
 
     data class Resolved(
         val mode: String,

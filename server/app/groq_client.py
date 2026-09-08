@@ -34,19 +34,22 @@ class GroqClient:
     async def chat_completions(self, payload: dict[str, Any]) -> dict[str, Any]:
         self._ensure_configured()
         body = dict(payload)
-        body.setdefault("model", self._settings.groq_chat_model)
+        # Hosted gateway always uses the server-configured model (client may send stale ids).
+        body["model"] = self._settings.groq_chat_model
+        # Reasoning models (e.g. gpt-oss) spend tokens on "reasoning" before content.
+        min_tokens = 512
         if "max_tokens" in body:
             body["max_tokens"] = min(
-                int(body["max_tokens"]),
+                max(int(body["max_tokens"]), min_tokens),
                 self._settings.max_completion_tokens,
             )
         elif "max_completion_tokens" in body:
             body["max_completion_tokens"] = min(
-                int(body["max_completion_tokens"]),
+                max(int(body["max_completion_tokens"]), min_tokens),
                 self._settings.max_completion_tokens,
             )
         else:
-            body["max_tokens"] = min(220, self._settings.max_completion_tokens)
+            body["max_tokens"] = min(min_tokens, self._settings.max_completion_tokens)
 
         response = await self._client.post("/chat/completions", json=body)
         return await self._json_or_raise(response)
@@ -96,4 +99,8 @@ class GroqClient:
             elif body.get("message"):
                 detail = body["message"]
 
-        raise HTTPException(status_code=response.status_code, detail=detail)
+        # Remap upstream 4xx (esp. model 404) so clients don't think our route is missing.
+        status = response.status_code
+        if status == 404:
+            status = 502
+        raise HTTPException(status_code=status, detail=detail)

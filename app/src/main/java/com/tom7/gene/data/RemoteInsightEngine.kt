@@ -141,7 +141,7 @@ object RemoteInsightEngine {
                 put(JSONObject().apply { put("role", "system"); put("content", system) })
                 put(JSONObject().apply { put("role", "user"); put("content", user) })
             })
-            put("max_tokens", 220)
+            put("max_tokens", 512)
         }
         val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
