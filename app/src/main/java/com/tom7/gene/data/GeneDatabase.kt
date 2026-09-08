@@ -199,12 +199,45 @@ class GeneDatabase(context: Context) : SQLiteOpenHelper(context, "gene.db", null
     fun setPersonFavorite(personId: Long, favorite: Boolean) { writableDatabase.update("people", ContentValues().apply { put("favorite", if (favorite) 1 else 0) }, "id = ?", arrayOf(personId.toString())) }
     fun updatePersonName(personId: Long, name: String) { writableDatabase.update("people", ContentValues().apply { put("name", name.trim()) }, "id = ?", arrayOf(personId.toString())) }
 
-    fun deletePerson(id: Long) {
-        if (person(id)?.isSelf == true) return
-        writableDatabase.delete("relationships", "person_a_id = ? OR person_b_id = ?", arrayOf(id.toString(), id.toString()))
-        writableDatabase.delete("interactions", "person_id = ?", arrayOf(id.toString()))
-        writableDatabase.delete("sessions", "person_id = ?", arrayOf(id.toString()))
-        writableDatabase.delete("people", "id = ?", arrayOf(id.toString()))
+    fun deletePerson(id: Long): Boolean {
+        if (person(id)?.isSelf == true) return false
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            // Drop speaker refs so messages don't block person removal.
+            db.execSQL(
+                "UPDATE messages SET speaker_person_id = NULL WHERE speaker_person_id = ?",
+                arrayOf(id.toString())
+            )
+            db.delete(
+                "relationships",
+                "person_a_id = ? OR person_b_id = ?",
+                arrayOf(id.toString(), id.toString())
+            )
+            db.delete("interactions", "person_id = ?", arrayOf(id.toString()))
+
+            // Hosted 1:1 and group sessions — clear children before parent (FK-safe).
+            val hostedIds = buildList {
+                db.rawQuery("SELECT id FROM sessions WHERE person_id = ?", arrayOf(id.toString())).use { c ->
+                    while (c.moveToNext()) add(c.getLong(0))
+                }
+            }
+            for (sessionId in hostedIds) {
+                val key = arrayOf(sessionId.toString())
+                db.delete("messages", "session_id = ?", key)
+                db.delete("session_members", "session_id = ?", key)
+                db.delete("sessions", "id = ?", key)
+            }
+
+            // Membership in groups hosted by someone else.
+            db.delete("session_members", "person_id = ?", arrayOf(id.toString()))
+
+            val removed = db.delete("people", "id = ?", arrayOf(id.toString()))
+            db.setTransactionSuccessful()
+            return removed > 0
+        } finally {
+            db.endTransaction()
+        }
     }
 
     /** Upsert an undirected relationship; stores ids ordered so (a,b) == (b,a). Returns id or -1. */

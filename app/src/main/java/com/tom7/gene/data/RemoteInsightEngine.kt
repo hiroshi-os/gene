@@ -9,6 +9,9 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 object RemoteInsightEngine {
+    private const val CONFIGURE_HINT =
+        "Open Settings → Intelligence and choose Gene AI, or set up BYOK with your own endpoint and API key."
+
     suspend fun personaReply(
         context: Context,
         person: Person,
@@ -19,7 +22,6 @@ object RemoteInsightEngine {
         peerNames: List<String> = emptyList()
     ): PersonaReply {
         val localConfidence = LocalRelevanceSearch.confidence(memories, question)
-        val localFallback = { InsightEngine.personaReply(person, memories, question) }
         return complete(
             context,
             person,
@@ -29,15 +31,29 @@ object RemoteInsightEngine {
             question,
             personaMode = true,
             localConfidence,
-            localFallback,
             peerNames = peerNames
         )
     }
 
-    suspend fun askAbout(context: Context, person: Person, memories: List<Interaction>, sessionMessages: List<ChatMessage>, earlierMessages: List<ChatMessage>, question: String): PersonaReply {
+    suspend fun askAbout(
+        context: Context,
+        person: Person,
+        memories: List<Interaction>,
+        sessionMessages: List<ChatMessage>,
+        earlierMessages: List<ChatMessage>,
+        question: String
+    ): PersonaReply {
         val localConfidence = LocalRelevanceSearch.confidence(memories, question)
-        val localFallback = { InsightEngine.askAbout(person, memories, question) }
-        return complete(context, person, memories, sessionMessages, earlierMessages, question, personaMode = false, localConfidence, localFallback)
+        return complete(
+            context,
+            person,
+            memories,
+            sessionMessages,
+            earlierMessages,
+            question,
+            personaMode = false,
+            localConfidence
+        )
     }
 
     suspend fun generatedSummary(context: Context, person: Person, memories: List<Interaction>): String = withContext(Dispatchers.IO) {
@@ -54,7 +70,23 @@ object RemoteInsightEngine {
                 "Person: ${person.name}\nMemories:\n$prompt"
             )
             response.ifBlank { InsightEngine.generatedSummary(person, memories) }
-        } catch (_: Exception) { InsightEngine.generatedSummary(person, memories) }
+        } catch (_: Exception) {
+            InsightEngine.generatedSummary(person, memories)
+        }
+    }
+
+    private fun providerUnavailable(llm: LlmSettings.Resolved): PersonaReply {
+        val text = when {
+            !llm.ready && llm.mode == LlmSettings.MODE_BYOK ->
+                "BYOK isn’t set up yet — Gene needs an endpoint and API key before it can reply. $CONFIGURE_HINT"
+            !llm.ready ->
+                "No AI provider is available right now. $CONFIGURE_HINT"
+            llm.mode == LlmSettings.MODE_BYOK ->
+                "Couldn’t reach your BYOK provider. Check the endpoint and key, or switch to Gene AI. $CONFIGURE_HINT"
+            else ->
+                "Couldn’t reach Gene AI right now. Check your connection, or switch to BYOK in Settings. $CONFIGURE_HINT"
+        }
+        return PersonaReply(text, confidence = 0, referenceIds = emptyList())
     }
 
     private suspend fun complete(
@@ -66,11 +98,10 @@ object RemoteInsightEngine {
         question: String,
         personaMode: Boolean,
         localConfidence: Int,
-        fallback: () -> PersonaReply,
         peerNames: List<String> = emptyList()
     ): PersonaReply = withContext(Dispatchers.IO) {
         val llm = LlmSettings.resolve(context)
-        if (!llm.ready || llm.chatEndpoint == null) return@withContext fallback()
+        if (!llm.ready || llm.chatEndpoint == null) return@withContext providerUnavailable(llm)
         try {
             val selectedContext = memories.joinToString("\n") { "- ${it.transcript ?: it.body.take(420)}" }.ifBlank { "No saved memory matched closely." }
             val peerHint = peerNames
@@ -96,8 +127,11 @@ object RemoteInsightEngine {
                 append("\nUser: ").append(question)
             }
             val content = rawCompletion(llm.chatEndpoint, llm.apiKey, llm.chatModel, system, conversation)
-            if (content.isBlank()) fallback() else PersonaReply(compactPersonaText(content), localConfidence, memories.map { it.id })
-        } catch (_: Exception) { fallback() }
+            if (content.isBlank()) providerUnavailable(llm)
+            else PersonaReply(compactPersonaText(content), localConfidence, memories.map { it.id })
+        } catch (_: Exception) {
+            providerUnavailable(llm)
+        }
     }
 
     private fun rawCompletion(endpoint: String, apiKey: String?, model: String, system: String, user: String): String {

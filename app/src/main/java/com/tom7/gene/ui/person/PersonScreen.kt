@@ -725,7 +725,11 @@ fun PersonScreen(
             person = person,
             db = db,
             onDismiss = { showDelete = false },
-            onDeleted = { showDelete = false; onBack() },
+            onDeleted = {
+                showDelete = false
+                onChanged()
+                onBack()
+            },
             colors = colors
         )
     }
@@ -818,8 +822,8 @@ fun DeletePersonSheet(
                     .clip(ButtonShape)
                     .background(colors.danger)
                     .clickable {
-                        db.deletePerson(person.id)
-                        onDeleted()
+                        if (db.deletePerson(person.id)) onDeleted()
+                        else onDismiss()
                     },
                 contentAlignment = Alignment.Center
             ) {
