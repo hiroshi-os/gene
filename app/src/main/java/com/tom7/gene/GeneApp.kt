@@ -30,7 +30,10 @@ import com.tom7.gene.ui.navigation.CHAT_TALK
 import com.tom7.gene.ui.person.PersonScreen
 import com.tom7.gene.ui.search.GlobalSearchScreen
 import com.tom7.gene.ui.search.SearchScreen
+import com.tom7.gene.ui.onboarding.ONBOARDING_COMPLETE_KEY
+import com.tom7.gene.ui.onboarding.OnboardingScreen
 import com.tom7.gene.ui.settings.SettingsScreen
+import com.tom7.gene.ui.theme.BlobStage
 import com.tom7.gene.ui.theme.GeneTheme
 import com.tom7.gene.ui.theme.NotionDarkBg
 import com.tom7.gene.ui.theme.NotionLightBg
@@ -50,12 +53,19 @@ fun GeneApp(initialPersonId: Long = -1L, initialOpenCapture: Boolean = false) {
     }
     var refresh by remember { mutableStateOf(0) }
     var homeTab by remember { mutableIntStateOf(0) }
+    var onboardingDone by remember { mutableStateOf(prefs.getBoolean(ONBOARDING_COMPLETE_KEY, false)) }
     val people = remember(refresh) { db.people() }
     LaunchedEffect(Unit) { db.getOrCreateSelf() }
     val toggleDark = {
         val next = !dark
         dark = next
         prefs.edit().putBoolean("dark_mode", next).apply()
+    }
+    val completeOnboarding: () -> Unit = {
+        prefs.edit().putBoolean(ONBOARDING_COMPLETE_KEY, true).apply()
+        onboardingDone = true
+        refresh++
+        Unit
     }
 
     LaunchedEffect(screen) {
@@ -69,14 +79,19 @@ fun GeneApp(initialPersonId: Long = -1L, initialOpenCapture: Boolean = false) {
 
     SideEffect {
         val window = (view.context as Activity).window
-        val bar = if (dark) NotionDarkBg else NotionLightBg
+        val cinematic = !onboardingDone
+        val bar = when {
+            cinematic -> BlobStage
+            dark -> NotionDarkBg
+            else -> NotionLightBg
+        }
         window.statusBarColor = bar.toArgb()
         window.navigationBarColor = bar.toArgb()
-        WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !dark
-        WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !dark
+        WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !cinematic && !dark
+        WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !cinematic && !dark
     }
 
-    BackHandler(enabled = screen != AppScreen.Home) {
+    BackHandler(enabled = onboardingDone && screen != AppScreen.Home) {
         screen = when (val current = screen) {
             is AppScreen.Chat -> AppScreen.PersonDetail(current.personId)
             is AppScreen.GroupChat -> AppScreen.Home
@@ -93,6 +108,15 @@ fun GeneApp(initialPersonId: Long = -1L, initialOpenCapture: Boolean = false) {
     }
 
     GeneTheme(darkTheme = dark) {
+        if (!onboardingDone) {
+            OnboardingScreen(
+                dark = dark,
+                db = db,
+                onToggleTheme = toggleDark,
+                onFinished = completeOnboarding
+            )
+            return@GeneTheme
+        }
         when (val current = screen) {
             AppScreen.Home -> HomeScreen(
                 people = people,
@@ -301,7 +325,12 @@ fun GeneApp(initialPersonId: Long = -1L, initialOpenCapture: Boolean = false) {
                 onBack = { screen = AppScreen.Home },
                 context = context,
                 db = db,
-                onDataChanged = { refresh++ }
+                onDataChanged = { refresh++ },
+                onReplayOnboarding = {
+                    prefs.edit().putBoolean(ONBOARDING_COMPLETE_KEY, false).apply()
+                    onboardingDone = false
+                    screen = AppScreen.Home
+                }
             )
         }
     }

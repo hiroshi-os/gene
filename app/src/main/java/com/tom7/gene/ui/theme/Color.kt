@@ -51,6 +51,13 @@ val NotionBlueDark = Color(0xFF529CCA)
 val NotionRed = Color(0xFFE03E3E)
 val NotionRedDark = Color(0xFFFF7369)
 
+// ─── Gene blob (flat Grok-style: one fill, solid black eyes) ──────────────────
+val BlobCream = Color(0xFFF3D7A0)
+val BlobEye = Color(0xFF111111)
+val BlobDeep = Color(0xFF2A2418)
+val BlobStage = Color(0xFF0C0B09)
+val BlobStageMuted = Color(0xFF6F6C66)
+
 // Soft pastel covers for Recents cards (Notion-like)
 val NotionPastelYellow = Color(0xFFFBF3DB)
 val NotionPastelPink = Color(0xFFF5E0E9)

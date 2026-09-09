@@ -91,7 +91,8 @@ fun SettingsScreen(
     onBack: () -> Unit,
     context: Context,
     db: GeneDatabase,
-    onDataChanged: () -> Unit
+    onDataChanged: () -> Unit,
+    onReplayOnboarding: () -> Unit = {}
 ) {
     val colors = rememberGeneColors(dark)
     val hazeState = rememberGeneHazeState()
@@ -202,6 +203,15 @@ fun SettingsScreen(
                         colors = colors,
                         icon = Icons.Outlined.DarkMode,
                         tileColor = colors.pastel(0)
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    SettingActionRow(
+                        title = "Replay onboarding",
+                        subtitle = "Meet Gene again and walk through the basics",
+                        colors = colors,
+                        icon = Icons.Outlined.AutoAwesome,
+                        tileColor = colors.pastel(2),
+                        onClick = onReplayOnboarding
                     )
                 }
             }
@@ -706,6 +716,43 @@ private fun SettingRow(
                 uncheckedBorderColor = colors.border
             )
         )
+    }
+}
+
+@Composable
+private fun SettingActionRow(
+    title: String,
+    subtitle: String,
+    colors: GeneColors,
+    icon: ImageVector,
+    tileColor: Color,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(IconTileShape)
+                .background(tileColor),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, null, tint = colors.textPrimary.copy(alpha = 0.65f), modifier = Modifier.size(15.dp))
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(title, color = colors.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Medium, fontFamily = GeneFontFamily)
+            Text(subtitle, color = colors.textSecondary, fontSize = 12.sp, fontFamily = GeneFontFamily)
+        }
     }
 }
 
