@@ -166,7 +166,7 @@ class GeneDatabase(context: Context) : SQLiteOpenHelper(context, "gene.db", null
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_session_members_person ON session_members(person_id)")
     }
 
-    fun addPerson(name: String, note: String = "", isSelf: Boolean = false): Long {
+    fun addPerson(name: String, note: String = "", isSelf: Boolean = false, avatar: String? = null): Long {
         val now = System.currentTimeMillis()
         return writableDatabase.insert(
             "people",
@@ -177,6 +177,7 @@ class GeneDatabase(context: Context) : SQLiteOpenHelper(context, "gene.db", null
                 put("created_at", now)
                 put("last_seen", now)
                 put("is_self", if (isSelf) 1 else 0)
+                if (avatar != null) put("avatar", avatar)
             }
         )
     }

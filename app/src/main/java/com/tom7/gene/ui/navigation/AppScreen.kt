@@ -5,6 +5,8 @@ const val CHAT_ASK = "ask"
 
 sealed interface AppScreen {
     data object Home : AppScreen
+    /** First-run orient + guided first capture. */
+    data object Onboarding : AppScreen
     /** Global search across people, chats, and memories. */
     data object GlobalSearch : AppScreen
     /** Obsidian-style people relationship graph. Optionally focus a person. */

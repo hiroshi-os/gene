@@ -27,6 +27,7 @@ import com.tom7.gene.ui.memory.MemoryDetailScreen
 import com.tom7.gene.ui.navigation.AppScreen
 import com.tom7.gene.ui.navigation.CHAT_ASK
 import com.tom7.gene.ui.navigation.CHAT_TALK
+import com.tom7.gene.ui.onboarding.OnboardingScreen
 import com.tom7.gene.ui.person.PersonScreen
 import com.tom7.gene.ui.search.GlobalSearchScreen
 import com.tom7.gene.ui.search.SearchScreen
@@ -34,6 +35,8 @@ import com.tom7.gene.ui.settings.SettingsScreen
 import com.tom7.gene.ui.theme.GeneTheme
 import com.tom7.gene.ui.theme.NotionDarkBg
 import com.tom7.gene.ui.theme.NotionLightBg
+
+private const val PREF_ONBOARDING_DONE = "onboarding_done"
 
 @Composable
 fun GeneApp(initialPersonId: Long = -1L, initialOpenCapture: Boolean = false) {
@@ -44,14 +47,20 @@ fun GeneApp(initialPersonId: Long = -1L, initialOpenCapture: Boolean = false) {
     var dark by remember { mutableStateOf(prefs.getBoolean("dark_mode", false)) }
     var screen by remember {
         mutableStateOf<AppScreen>(
-            if (initialPersonId > 0) AppScreen.PersonDetail(initialPersonId, openCapture = initialOpenCapture)
-            else AppScreen.Home
+            when {
+                initialPersonId > 0 -> AppScreen.PersonDetail(initialPersonId, openCapture = initialOpenCapture)
+                !prefs.getBoolean(PREF_ONBOARDING_DONE, false) -> AppScreen.Onboarding
+                else -> AppScreen.Home
+            }
         )
     }
     var refresh by remember { mutableStateOf(0) }
     var homeTab by remember { mutableIntStateOf(0) }
     val people = remember(refresh) { db.people() }
     LaunchedEffect(Unit) { db.getOrCreateSelf() }
+    val markOnboardingDone = {
+        prefs.edit().putBoolean(PREF_ONBOARDING_DONE, true).apply()
+    }
     val toggleDark = {
         val next = !dark
         dark = next
@@ -76,7 +85,7 @@ fun GeneApp(initialPersonId: Long = -1L, initialOpenCapture: Boolean = false) {
         WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !dark
     }
 
-    BackHandler(enabled = screen != AppScreen.Home) {
+    BackHandler(enabled = screen != AppScreen.Home && screen != AppScreen.Onboarding) {
         screen = when (val current = screen) {
             is AppScreen.Chat -> AppScreen.PersonDetail(current.personId)
             is AppScreen.GroupChat -> AppScreen.Home
@@ -88,12 +97,30 @@ fun GeneApp(initialPersonId: Long = -1L, initialOpenCapture: Boolean = false) {
             is AppScreen.AllMemories -> AppScreen.PersonDetail(current.personId)
             is AppScreen.MemoryDetail -> AppScreen.PersonDetail(current.personId)
             AppScreen.GlobalSearch, is AppScreen.PersonDetail, AppScreen.Settings -> AppScreen.Home
-            AppScreen.Home -> AppScreen.Home
+            AppScreen.Home, AppScreen.Onboarding -> AppScreen.Home
         }
     }
 
     GeneTheme(darkTheme = dark) {
         when (val current = screen) {
+            AppScreen.Onboarding -> OnboardingScreen(
+                dark = dark,
+                onSkip = {
+                    markOnboardingDone()
+                    screen = AppScreen.Home
+                },
+                onSelfReady = { avatar ->
+                    val self = db.getOrCreateSelf()
+                    db.updatePersonAvatar(self.id, avatar)
+                    refresh++
+                },
+                onPersonCreated = { name, note, avatar ->
+                    markOnboardingDone()
+                    val id = db.addPerson(name, note, avatar = avatar)
+                    refresh++
+                    screen = AppScreen.PersonDetail(id, openCapture = true)
+                }
+            )
             AppScreen.Home -> HomeScreen(
                 people = people,
                 dark = dark,
