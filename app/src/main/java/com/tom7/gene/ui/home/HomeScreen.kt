@@ -87,6 +87,8 @@ import com.tom7.gene.ui.common.NotionTopChrome
 import com.tom7.gene.ui.common.asRelativeTime
 import com.tom7.gene.ui.common.geneHazeSource
 import com.tom7.gene.ui.common.rememberGeneHazeState
+import com.tom7.gene.ui.blob.GeneBlob
+import com.tom7.gene.ui.blob.GeneBlobMood
 import com.tom7.gene.ui.theme.GeneColors
 import com.tom7.gene.ui.theme.GeneFontFamily
 import com.tom7.gene.ui.theme.GeneSpace
@@ -345,20 +347,30 @@ private fun PeopleHomeContent(
     ) {
         item {
             Column(Modifier.padding(horizontal = GeneSpace.lg, vertical = GeneSpace.xs)) {
-                Text(
-                    "Gene",
-                    color = colors.textPrimary,
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = GeneFontFamily,
-                    letterSpacing = (-0.5).sp
-                )
-                Text(
-                    "Capture · patterns · talk about someone",
-                    color = colors.textSecondary,
-                    fontSize = 13.sp,
-                    fontFamily = GeneFontFamily
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    GeneBlob(
+                        modifier = Modifier.size(52.dp),
+                        mood = GeneBlobMood.Idle,
+                        interactive = true
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            "Gene",
+                            color = colors.textPrimary,
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = GeneFontFamily,
+                            letterSpacing = (-0.5).sp
+                        )
+                        Text(
+                            "Capture · patterns · talk about someone",
+                            color = colors.textSecondary,
+                            fontSize = 13.sp,
+                            fontFamily = GeneFontFamily
+                        )
+                    }
+                }
                 Spacer(Modifier.height(14.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -800,7 +812,12 @@ private fun HomeSearchField(
 
 @Composable
 private fun EmptyHint(colors: GeneColors, message: String) {
-    Box(Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 40.dp), contentAlignment = Alignment.Center) {
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        GeneBlob(modifier = Modifier.size(88.dp), mood = GeneBlobMood.Curious, interactive = true)
+        Spacer(Modifier.height(10.dp))
         Text(message, color = colors.textSecondary, fontSize = 15.sp, fontFamily = GeneFontFamily)
     }
 }
