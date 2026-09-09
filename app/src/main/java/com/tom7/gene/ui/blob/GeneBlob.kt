@@ -24,13 +24,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -42,16 +37,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.input.pointer.positionChange
-import com.tom7.gene.ui.theme.BlobBlush
 import com.tom7.gene.ui.theme.BlobCream
-import com.tom7.gene.ui.theme.BlobDeep
 import com.tom7.gene.ui.theme.BlobEye
-import com.tom7.gene.ui.theme.BlobGlow
-import com.tom7.gene.ui.theme.BlobHighlight
-import com.tom7.gene.ui.theme.BlobPeach
-import com.tom7.gene.ui.theme.BlobSpeck
-import com.tom7.gene.ui.theme.BlobThink
-import com.tom7.gene.ui.theme.BlobWarm
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.PI
@@ -68,8 +55,8 @@ enum class GeneBlobMood {
 }
 
 /**
- * Animated clay blob mascot. Cream/peach lighting, glossy eyes, springy morph —
- * the same construction Grok Bot uses (organic ring, gaze, blink, state-as-motion).
+ * Flat Grok-style blob: one filled body, two solid black eyes.
+ * Motion (morph, blink, gaze) carries state — no lighting, blush, or highlights.
  */
 @Composable
 fun GeneBlob(
@@ -197,7 +184,7 @@ fun GeneBlob(
 
     Box(
         modifier = modifier
-            .semantics { contentDescription = "Gene, a cream clay blob" }
+            .semantics { contentDescription = "Gene" }
             .then(pointerMod)
     ) {
         Canvas(Modifier.fillMaxSize()) {
@@ -269,112 +256,22 @@ private fun DrawScope.drawGeneBlob(
     val cx = size.width * 0.5f
     val cy = size.height * 0.52f
     val baseR = min * 0.34f
-    val breatheScale = 1f + breathe * 0.035f - press * 0.04f
-    val rx = baseR * (1.08f + squash * 0.55f) * breatheScale
-    val ry = baseR * (1.18f - squash * 0.7f) * breatheScale
-
+    val breatheScale = 1f + breathe * 0.03f - press * 0.04f
+    val rx = baseR * (1.08f + squash * 0.45f) * breatheScale
+    val ry = baseR * (1.16f - squash * 0.6f) * breatheScale
     val body = blobPath(cx, cy, rx, ry, time, mood)
 
-    val glowColor = when (mood) {
-        GeneBlobMood.Thinking -> BlobThink.copy(alpha = 0.42f)
-        GeneBlobMood.Happy -> BlobGlow.copy(alpha = 0.38f)
-        GeneBlobMood.Listening -> BlobPeach.copy(alpha = 0.32f)
-        else -> BlobGlow.copy(alpha = 0.22f)
-    }
-    drawOval(
-        brush = Brush.radialGradient(
-            colors = listOf(glowColor, Color.Transparent),
-            center = Offset(cx, cy + ry * 0.95f),
-            radius = rx * 1.55f
-        ),
-        topLeft = Offset(cx - rx * 1.15f, cy + ry * 0.35f),
-        size = Size(rx * 2.3f, ry * 0.95f)
+    drawPath(path = body, color = BlobCream)
+    drawEyes(
+        cx = cx,
+        eyeY = cy - ry * 0.10f,
+        spread = rx * 0.32f,
+        radiusX = rx * 0.155f,
+        radiusY = ry * 0.175f,
+        gaze = gaze,
+        blink = blink,
+        mood = mood
     )
-    drawOval(
-        color = Color(0x66000000),
-        topLeft = Offset(cx - rx * 0.72f, cy + ry * 0.72f),
-        size = Size(rx * 1.44f, ry * 0.28f)
-    )
-
-    drawPath(
-        path = body,
-        brush = Brush.radialGradient(
-            colors = listOf(BlobHighlight, BlobCream, BlobPeach, BlobWarm),
-            center = Offset(cx - rx * 0.28f, cy - ry * 0.42f),
-            radius = rx * 2.15f
-        )
-    )
-
-    clipPath(body) {
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(BlobWarm.copy(alpha = 0.72f), Color.Transparent),
-                center = Offset(cx + rx * 0.28f, cy + ry * 0.48f),
-                radius = rx * 0.95f
-            ),
-            radius = rx * 0.95f,
-            center = Offset(cx + rx * 0.28f, cy + ry * 0.48f)
-        )
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(BlobHighlight.copy(alpha = 0.9f), Color.Transparent),
-                center = Offset(cx - rx * 0.32f, cy - ry * 0.4f),
-                radius = rx * 0.55f
-            ),
-            radius = rx * 0.55f,
-            center = Offset(cx - rx * 0.32f, cy - ry * 0.4f)
-        )
-        drawRect(
-            brush = Brush.verticalGradient(
-                0f to Color.Transparent,
-                0.55f to Color.Transparent,
-                1f to BlobDeep.copy(alpha = 0.18f)
-            )
-        )
-        if (mood == GeneBlobMood.Thinking) {
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(BlobThink.copy(alpha = 0.28f), Color.Transparent),
-                    center = Offset(cx, cy),
-                    radius = rx * 1.1f
-                ),
-                radius = rx * 1.1f,
-                center = Offset(cx, cy)
-            )
-        }
-        val blushAlpha = if (mood == GeneBlobMood.Happy) 0.55f else 0.32f
-        val eyeSpread = rx * 0.34f
-        val eyeY = cy - ry * 0.12f
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(BlobBlush.copy(alpha = blushAlpha), Color.Transparent),
-                center = Offset(cx - eyeSpread * 1.35f, eyeY + ry * 0.28f),
-                radius = rx * 0.28f
-            ),
-            radius = rx * 0.28f,
-            center = Offset(cx - eyeSpread * 1.35f, eyeY + ry * 0.28f)
-        )
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(BlobBlush.copy(alpha = blushAlpha), Color.Transparent),
-                center = Offset(cx + eyeSpread * 1.35f, eyeY + ry * 0.28f),
-                radius = rx * 0.28f
-            ),
-            radius = rx * 0.28f,
-            center = Offset(cx + eyeSpread * 1.35f, eyeY + ry * 0.28f)
-        )
-
-        drawEyes(
-            cx = cx,
-            eyeY = eyeY,
-            spread = eyeSpread,
-            radius = rx * 0.168f,
-            gaze = gaze,
-            blink = blink,
-            mood = mood
-        )
-        drawSmile(cx, eyeY + rx * 0.34f, rx * 0.16f, mood)
-    }
 }
 
 private fun blobPath(
@@ -433,60 +330,29 @@ private fun DrawScope.drawEyes(
     cx: Float,
     eyeY: Float,
     spread: Float,
-    radius: Float,
+    radiusX: Float,
+    radiusY: Float,
     gaze: Offset,
     blink: Float,
     mood: GeneBlobMood
 ) {
     val open = (1f - blink).coerceIn(0.08f, 1f)
-    val lookScale = if (mood == GeneBlobMood.Curious) 1.08f else 1f
-    val pupilTravel = radius * 0.38f
+    val look = if (mood == GeneBlobMood.Curious) 1.06f else 1f
+    val dx = gaze.x * radiusX * 0.55f
+    val dy = gaze.y * radiusY * 0.4f
     listOf(-1f, 1f).forEach { side ->
-        val ex = cx + side * spread
-        val ey = eyeY
+        val ex = cx + side * spread + dx
+        val ey = eyeY + dy
         withTransform({
             translate(ex, ey)
-            scale(lookScale, open, Offset.Zero)
+            scale(look, open * look, Offset.Zero)
         }) {
-            drawCircle(color = BlobEye, radius = radius)
-            val px = gaze.x * pupilTravel
-            val py = gaze.y * pupilTravel * 0.7f
-            drawCircle(
-                color = Color(0xFF2A2118),
-                radius = radius * 0.42f,
-                center = Offset(px * 0.35f, py * 0.35f)
-            )
-            drawCircle(
-                color = BlobSpeck,
-                radius = radius * 0.22f,
-                center = Offset(-radius * 0.28f + px * 0.15f, -radius * 0.32f + py * 0.1f)
-            )
-            drawCircle(
-                color = BlobSpeck.copy(alpha = 0.7f),
-                radius = radius * 0.09f,
-                center = Offset(radius * 0.22f, -radius * 0.08f)
+            drawOval(
+                color = BlobEye,
+                topLeft = Offset(-radiusX, -radiusY),
+                size = Size(radiusX * 2f, radiusY * 2f)
             )
         }
     }
-}
-
-private fun DrawScope.drawSmile(cx: Float, cy: Float, width: Float, mood: GeneBlobMood) {
-    val lift = when (mood) {
-        GeneBlobMood.Happy -> 1.25f
-        GeneBlobMood.Curious -> 0.7f
-        GeneBlobMood.Thinking -> 0.15f
-        GeneBlobMood.Listening -> 0.55f
-        GeneBlobMood.Idle -> 0.45f
-    }
-    if (lift < 0.2f) return
-    val path = Path().apply {
-        moveTo(cx - width, cy)
-        quadraticTo(cx, cy + width * 0.55f * lift, cx + width, cy)
-    }
-    drawPath(
-        path,
-        color = BlobDeep.copy(alpha = 0.55f),
-        style = Stroke(width = size.minDimension * 0.012f, cap = StrokeCap.Round)
-    )
 }
 

@@ -74,11 +74,8 @@ import com.tom7.gene.ui.blob.GeneBlob
 import com.tom7.gene.ui.blob.GeneBlobMood
 import com.tom7.gene.ui.theme.BlobCream
 import com.tom7.gene.ui.theme.BlobDeep
-import com.tom7.gene.ui.theme.BlobPeach
 import com.tom7.gene.ui.theme.BlobStage
 import com.tom7.gene.ui.theme.BlobStageMuted
-import com.tom7.gene.ui.theme.BlobThink
-import com.tom7.gene.ui.theme.BlobWarm
 import com.tom7.gene.ui.theme.GeneFontFamily
 import com.tom7.gene.ui.theme.NotionDarkBg
 import com.tom7.gene.ui.theme.NotionLightBg
@@ -383,27 +380,11 @@ private fun StageGlow() {
     Box(Modifier.fillMaxSize()) {
         Box(
             Modifier
-                .align(Alignment.TopEnd)
-                .offset(x = 40.dp, y = (-30).dp)
+                .align(Alignment.Center)
+                .offset(y = (-40).dp)
                 .size(280.dp)
                 .blur(90.dp)
-                .background(BlobWarm.copy(alpha = 0.28f), CircleShape)
-        )
-        Box(
-            Modifier
-                .align(Alignment.CenterStart)
-                .offset(x = (-60).dp, y = 40.dp)
-                .size(240.dp)
-                .blur(90.dp)
-                .background(BlobPeach.copy(alpha = 0.18f), CircleShape)
-        )
-        Box(
-            Modifier
-                .align(Alignment.BottomCenter)
-                .offset(y = 40.dp)
-                .size(320.dp)
-                .blur(100.dp)
-                .background(BlobThink.copy(alpha = 0.1f), CircleShape)
+                .background(BlobCream.copy(alpha = 0.12f), CircleShape)
         )
     }
 }
@@ -653,7 +634,7 @@ private fun AskStep(
         Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
             Text(
                 if (thinking) "Looking through what you captured…" else reply.orEmpty(),
-                color = if (thinking) BlobPeach else StageText,
+                color = if (thinking) BlobCream else StageText,
                 fontSize = 15.sp,
                 fontFamily = GeneFontFamily,
                 lineHeight = 22.sp,
@@ -698,7 +679,7 @@ private fun LookStep(mood: GeneBlobMood, preferDark: Boolean, onPick: (Boolean) 
     GeneBlob(modifier = Modifier.size(132.dp), mood = mood, interactive = true)
     Text("How should Gene look?", color = StageText, fontSize = 26.sp, fontWeight = FontWeight.Bold, fontFamily = GeneFontFamily, textAlign = TextAlign.Center)
     Spacer(Modifier.height(6.dp))
-    Text("You can change this anytime in Settings. The blob keeps the same cream clay in both.", color = StageDim, fontSize = 14.sp, fontFamily = GeneFontFamily, textAlign = TextAlign.Center)
+    Text("You can change this anytime in Settings.", color = StageDim, fontSize = 14.sp, fontFamily = GeneFontFamily, textAlign = TextAlign.Center)
     Spacer(Modifier.height(20.dp))
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         LookTile("Dark", "Warm charcoal", NotionDarkBg, StageText, preferDark, Modifier.weight(1f)) { onPick(true) }

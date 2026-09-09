@@ -51,18 +51,10 @@ val NotionBlueDark = Color(0xFF529CCA)
 val NotionRed = Color(0xFFE03E3E)
 val NotionRedDark = Color(0xFFFF7369)
 
-// ─── Gene blob (Grok-inspired cream clay mascot) ──────────────────────────────
-val BlobCream = Color(0xFFF6E7C8)
-val BlobHighlight = Color(0xFFFFF8EC)
-val BlobPeach = Color(0xFFF0C9A0)
-val BlobWarm = Color(0xFFE8B07A)
-val BlobShadow = Color(0xFFC48A55)
-val BlobDeep = Color(0xFF8F5E38)
-val BlobBlush = Color(0xFFE89272)
-val BlobEye = Color(0xFF1A140F)
-val BlobSpeck = Color(0xFFFFFFFF)
-val BlobGlow = Color(0xFFFFD9A8)
-val BlobThink = Color(0xFFB08CFF)
+// ─── Gene blob (flat Grok-style: one fill, solid black eyes) ──────────────────
+val BlobCream = Color(0xFFF3D7A0)
+val BlobEye = Color(0xFF111111)
+val BlobDeep = Color(0xFF2A2418)
 val BlobStage = Color(0xFF0C0B09)
 val BlobStageMuted = Color(0xFF6F6C66)
 
