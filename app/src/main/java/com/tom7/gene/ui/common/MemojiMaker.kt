@@ -321,6 +321,111 @@ private fun DrawScope.drawGlasses(style: String, w: Float, h: Float) {
     )
 }
 
+fun randomMemojiConfig(): MemojiConfig = MemojiConfig(
+    skinColor = SkinPalette.random(),
+    hairStyle = HairStyles.random(),
+    hairColor = HairColorPalette.random(),
+    eyeExpression = EyeExpressions.random(),
+    glasses = GlassesOptions.random(),
+    bgColor = BgColorPalette.random()
+)
+
+/**
+ * Inline memoji lab controls (tabs + palettes) — shared by sheet + onboarding.
+ */
+@Composable
+fun MemojiLabControls(
+    config: MemojiConfig,
+    onConfigChange: (MemojiConfig) -> Unit,
+    isDark: Boolean,
+    modifier: Modifier = Modifier
+) {
+    var selectedTab by remember { mutableIntStateOf(0) }
+    val colors = rememberGeneColors(isDark)
+    val tabs = listOf("Skin", "Hair", "Eyes", "Glasses", "Color")
+
+    Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        ScrollableTabRow(
+            selectedTabIndex = selectedTab,
+            containerColor = Color.Transparent,
+            edgePadding = 16.dp,
+            divider = {}
+        ) {
+            tabs.forEachIndexed { index, title ->
+                Tab(
+                    selected = selectedTab == index,
+                    onClick = { selectedTab = index },
+                    text = {
+                        Text(
+                            title,
+                            color = if (selectedTab == index) colors.accent else colors.textSecondary,
+                            fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
+                            fontFamily = GeneFontFamily
+                        )
+                    }
+                )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        when (selectedTab) {
+            0 -> ColorPaletteRow(colors = SkinPalette, selectedColor = config.skinColor) {
+                onConfigChange(config.copy(skinColor = it))
+            }
+            1 -> Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Text("Style", color = colors.textSecondary, fontSize = 13.sp, fontFamily = GeneFontFamily)
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    HairStyles.forEach { style ->
+                        OptionChip(
+                            title = style.replaceFirstChar { it.uppercase() },
+                            isSelected = config.hairStyle == style,
+                            isDark = isDark
+                        ) { onConfigChange(config.copy(hairStyle = style)) }
+                    }
+                }
+                Text("Color", color = colors.textSecondary, fontSize = 13.sp, fontFamily = GeneFontFamily)
+                ColorPaletteRow(colors = HairColorPalette, selectedColor = config.hairColor) {
+                    onConfigChange(config.copy(hairColor = it))
+                }
+            }
+            2 -> Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                EyeExpressions.forEach { expr ->
+                    OptionChip(
+                        title = expr.replaceFirstChar { it.uppercase() },
+                        isSelected = config.eyeExpression == expr,
+                        isDark = isDark
+                    ) { onConfigChange(config.copy(eyeExpression = expr)) }
+                }
+            }
+            3 -> Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                GlassesOptions.forEach { g ->
+                    OptionChip(
+                        title = g.replaceFirstChar { it.uppercase() },
+                        isSelected = config.glasses == g,
+                        isDark = isDark
+                    ) { onConfigChange(config.copy(glasses = g)) }
+                }
+            }
+            4 -> ColorPaletteRow(colors = BgColorPalette, selectedColor = config.bgColor) {
+                onConfigChange(config.copy(bgColor = it))
+            }
+        }
+    }
+}
+
 /**
  * Memoji maker — Notion chrome
  */
@@ -334,8 +439,6 @@ fun MemojiMakerSheet(
 ) {
     var config by remember { mutableStateOf(initialConfig) }
     val colors = rememberGeneColors(isDark)
-    var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Skin", "Hair", "Eyes", "Glasses", "Color")
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -348,7 +451,6 @@ fun MemojiMakerSheet(
                 .padding(bottom = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Header Bar: Cancel | Memoji | Done
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -371,7 +473,6 @@ fun MemojiMakerSheet(
                 }
             }
 
-            // Live Large Memoji Preview Bubble (100dp)
             Box(
                 modifier = Modifier
                     .padding(vertical = 12.dp)
@@ -381,93 +482,15 @@ fun MemojiMakerSheet(
                 MemojiAvatar(config = config, size = 100.dp)
             }
 
-            // Quick Randomize Button
-            IconButton(
-                onClick = {
-                    config = config.copy(
-                        skinColor = SkinPalette.random(),
-                        hairStyle = HairStyles.random(),
-                        hairColor = HairColorPalette.random(),
-                        eyeExpression = EyeExpressions.random(),
-                        glasses = GlassesOptions.random(),
-                        bgColor = BgColorPalette.random()
-                    )
-                }
-            ) {
+            IconButton(onClick = { config = randomMemojiConfig() }) {
                 Icon(Icons.Outlined.Casino, "Randomize", tint = colors.accent)
             }
 
-            // Category Tab Row
-            ScrollableTabRow(
-                selectedTabIndex = selectedTab,
-                containerColor = Color.Transparent,
-                edgePadding = 16.dp,
-                divider = {}
-            ) {
-                tabs.forEachIndexed { index, title ->
-                    Tab(
-                        selected = selectedTab == index,
-                        onClick = { selectedTab = index },
-                        text = {
-                            Text(
-                                title,
-                                color = if (selectedTab == index) colors.accent else colors.textSecondary,
-                                fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal
-                            )
-                        }
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            // Tab Customization Options
-            when (selectedTab) {
-                0 -> { // Skin
-                    ColorPaletteRow(colors = SkinPalette, selectedColor = config.skinColor) {
-                        config = config.copy(skinColor = it)
-                    }
-                }
-                1 -> { // Hair
-                    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Text("Style", color = if (isDark) Color.Gray else Color.DarkGray, fontSize = 13.sp)
-                        Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            HairStyles.forEach { style ->
-                                OptionChip(title = style.replaceFirstChar { it.uppercase() }, isSelected = config.hairStyle == style, isDark = isDark) {
-                                    config = config.copy(hairStyle = style)
-                                }
-                            }
-                        }
-                        Text("Color", color = if (isDark) Color.Gray else Color.DarkGray, fontSize = 13.sp)
-                        ColorPaletteRow(colors = HairColorPalette, selectedColor = config.hairColor) {
-                            config = config.copy(hairColor = it)
-                        }
-                    }
-                }
-                2 -> { // Eyes
-                    Row(modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        EyeExpressions.forEach { expr ->
-                            OptionChip(title = expr.replaceFirstChar { it.uppercase() }, isSelected = config.eyeExpression == expr, isDark = isDark) {
-                                config = config.copy(eyeExpression = expr)
-                            }
-                        }
-                    }
-                }
-                3 -> { // Glasses
-                    Row(modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        GlassesOptions.forEach { g ->
-                            OptionChip(title = g.replaceFirstChar { it.uppercase() }, isSelected = config.glasses == g, isDark = isDark) {
-                                config = config.copy(glasses = g)
-                            }
-                        }
-                    }
-                }
-                4 -> { // Background Color
-                    ColorPaletteRow(colors = BgColorPalette, selectedColor = config.bgColor) {
-                        config = config.copy(bgColor = it)
-                    }
-                }
-            }
+            MemojiLabControls(
+                config = config,
+                onConfigChange = { config = it },
+                isDark = isDark
+            )
         }
     }
 }
